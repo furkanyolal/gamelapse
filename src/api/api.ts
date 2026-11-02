@@ -32,6 +32,7 @@ import type {
   SettingsUpdate,
   SteamApiSettings,
   TrackerStatus,
+  UpdateInfo,
 } from "./types";
 
 /** One camelCase method per IPC command in docs/contract.md. */
@@ -96,6 +97,10 @@ export interface Api {
   exportData(options: ExportOptions): Promise<ExportResult | null>;
   backupDatabase(): Promise<BackupInfo | null>;
   restoreDatabase(): Promise<null>;
+  getAutostart(): Promise<boolean>;
+  setAutostart(enabled: boolean): Promise<boolean>;
+  checkForUpdate(): Promise<UpdateInfo | null>;
+  installUpdate(): Promise<null>;
   /** Subscribe to a backend event; returns the unsubscribe function. */
   on<E extends ApiEventName>(
     event: E,

@@ -15,12 +15,64 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import { useGames } from "@/hooks/use-games";
 import { useLimits } from "@/hooks/use-limits";
+import { useSettings, useUpdateSettings } from "@/hooks/use-settings";
+import { useAutostart, useSetAutostart } from "@/hooks/use-system";
 import { useDailyTotals, useDashboardStats } from "@/hooks/use-stats";
 import { useTrackerStatus } from "@/hooks/use-tracker";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import { limitTitle } from "@/lib/limits";
+
+function StartupHint() {
+  const settings = useSettings();
+  const autostart = useAutostart();
+  const setAutostart = useSetAutostart();
+  const update = useUpdateSettings();
+
+  if (
+    settings.data === undefined ||
+    autostart.data === undefined ||
+    settings.data.startupHintDismissed ||
+    autostart.data
+  ) {
+    return null;
+  }
+
+  const dismiss = () => update.mutate({ startupHintDismissed: true });
+  const busy = setAutostart.isPending || update.isPending;
+
+  return (
+    <div
+      role="region"
+      aria-label="Start with Windows"
+      className="bg-muted flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+    >
+      <p className="text-sm">
+        Start Gamelapse with Windows so no play session is ever missed. It runs
+        quietly in the tray.
+      </p>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            setAutostart.mutate(true, {
+              onSuccess: dismiss,
+              onError: (e) => toast.error(e.message),
+            })
+          }
+        >
+          Enable
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={dismiss}>
+          Not now
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const stats = useDashboardStats();
@@ -37,6 +89,8 @@ export default function Dashboard() {
         title="Dashboard"
         description="Today's playtime and recent activity."
       />
+
+      <StartupHint />
 
       {noGames && (
         <EmptyState title="No games yet">

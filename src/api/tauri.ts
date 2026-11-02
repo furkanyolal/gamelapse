@@ -73,6 +73,10 @@ export function createTauriApi(): Api {
     exportData: (options) => call("export_data", { options }),
     backupDatabase: () => call("backup_database"),
     restoreDatabase: () => call("restore_database"),
+    getAutostart: () => call("get_autostart"),
+    setAutostart: (enabled) => call("set_autostart", { enabled }),
+    checkForUpdate: () => call("check_for_update"),
+    installUpdate: () => call("install_update"),
     on: (event, handler) => {
       // listen() is async; unsubscribe even if it is called before it resolves.
       let cancelled = false;

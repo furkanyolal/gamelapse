@@ -187,6 +187,7 @@ const settingsPatch = (patch: Partial<SettingsUpdate>): SettingsUpdate => ({
   trackingEnabled: null,
   theme: null,
   importOnStartup: null,
+  startupHintDismissed: null,
   notificationsEnabled: null,
   reminderIntervalSecs: null,
   ...patch,
@@ -433,5 +434,57 @@ describe("mock api: launcher imports", () => {
     const covers = games.map((g) => g.game.coverPath).filter(Boolean);
     expect(covers).toHaveLength(2);
     covers.forEach((c) => expect(c).toMatch(/^https:\/\//));
+  });
+});
+
+describe("mock api autostart and updates", () => {
+  it("toggles autostart", async () => {
+    const api = createMockApi();
+    expect(await api.getAutostart()).toBe(false);
+    expect(await api.setAutostart(true)).toBe(true);
+    expect(await api.getAutostart()).toBe(true);
+    expect(await api.setAutostart(false)).toBe(false);
+  });
+
+  it("alternates update checks, null first", async () => {
+    const api = createMockApi();
+    expect(await api.checkForUpdate()).toBeNull();
+    const info = await api.checkForUpdate();
+    expect(info?.version).toBe("1.1.0");
+    expect(info?.notes).toBeTruthy();
+    expect(await api.checkForUpdate()).toBeNull();
+  });
+
+  it("emits five progress events while installing", async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const seen: number[] = [];
+      const off = api.on("update-progress", (p) => seen.push(p.downloaded));
+      const done = api.installUpdate();
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(done).resolves.toBeNull();
+      off();
+      expect(seen).toHaveLength(5);
+      expect(seen).toEqual([...seen].sort((a, b) => a - b));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("announces an available update about 10 seconds after creation", async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const versions: string[] = [];
+      const off = api.on("update-available", (u) => versions.push(u.version));
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(versions).toEqual([]);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(versions).toEqual(["1.1.0"]);
+      off();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

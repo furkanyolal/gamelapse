@@ -55,6 +55,14 @@ import {
   useSettings,
   useUpdateSettings,
 } from "@/hooks/use-settings";
+import {
+  useAutostart,
+  useCheckForUpdate,
+  useInstallUpdate,
+  useSetAutostart,
+  useUpdateCheckResult,
+  useUpdateProgress,
+} from "@/hooks/use-system";
 import { useSetTrackingEnabled } from "@/hooks/use-tracker";
 import { formatDuration, formatRelativeShort } from "@/lib/format";
 import { limitTitle } from "@/lib/limits";
@@ -128,6 +136,136 @@ function NumberField({
         <span className="text-muted-foreground text-sm">{suffix}</span>
       </div>
     </div>
+  );
+}
+
+function GeneralCard() {
+  const autostart = useAutostart();
+  const setAutostart = useSetAutostart();
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>General</CardTitle>
+        <CardDescription>How Gamelapse runs on your PC.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="autostart">Start with Windows</Label>
+            <p className="text-muted-foreground text-xs">
+              Launch minimized to the tray at sign-in so no session is missed.
+            </p>
+          </div>
+          <Switch
+            id="autostart"
+            checked={autostart.data ?? false}
+            disabled={autostart.isPending || setAutostart.isPending}
+            onCheckedChange={(enabled) =>
+              setAutostart.mutate(enabled, {
+                onError: (e) => toast.error(e.message),
+              })
+            }
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UpdatesCard() {
+  const info = useAppInfo();
+  const last = useUpdateCheckResult();
+  const check = useCheckForUpdate();
+  const install = useInstallUpdate();
+  const progress = useUpdateProgress(install.isPending);
+  const update = last.data ?? null;
+
+  const percent =
+    progress && progress.total
+      ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
+      : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Updates</CardTitle>
+        <CardDescription>
+          Current version {info.data?.version ?? "…"}
+        </CardDescription>
+        <CardAction>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={check.isPending || install.isPending}
+            onClick={() =>
+              check.mutate(undefined, {
+                onError: (e) =>
+                  toast.error(`Update check failed: ${e.message}`),
+              })
+            }
+          >
+            {check.isPending ? "Checking…" : "Check for updates"}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {last.data === undefined ? (
+          <p className="text-muted-foreground text-sm">
+            No update check yet this session.
+          </p>
+        ) : update === null ? (
+          <p className="text-sm">Up to date</p>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm font-medium">
+              Version {update.version} available
+            </p>
+            {update.date && (
+              <p className="text-muted-foreground text-xs">
+                Released {new Date(update.date).toLocaleDateString()}
+              </p>
+            )}
+            {update.notes && (
+              <p className="text-muted-foreground text-sm whitespace-pre-wrap">
+                {update.notes}
+              </p>
+            )}
+            {install.isPending && (
+              <div
+                role="progressbar"
+                aria-label="Update download"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={percent ?? undefined}
+                className="bg-muted h-2 w-full overflow-hidden rounded-full"
+              >
+                <div
+                  className={
+                    percent === null
+                      ? "bg-primary h-full w-1/3 animate-pulse"
+                      : "bg-primary h-full transition-all"
+                  }
+                  style={
+                    percent === null ? undefined : { width: `${percent}%` }
+                  }
+                />
+              </div>
+            )}
+            <Button
+              disabled={install.isPending}
+              onClick={() =>
+                install.mutate(undefined, {
+                  onError: (e) => toast.error(`Update failed: ${e.message}`),
+                })
+              }
+            >
+              {install.isPending ? "Downloading…" : "Install and restart"}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -797,11 +935,13 @@ export default function Settings() {
       {settings.error && (
         <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
       )}
+      <GeneralCard />
       {settings.data && <TrackingCard settings={settings.data} />}
       {settings.data && <LimitsCard settings={settings.data} />}
       {settings.data && <ImportCard settings={settings.data} />}
       <SteamApiCard />
       <DataCard />
+      <UpdatesCard />
 
       <Card>
         <CardHeader>

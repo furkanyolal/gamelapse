@@ -22,6 +22,8 @@ export const keys = {
   statsHourly: (days: number) => ["stats", "hourly", days] as const,
   settings: ["settings"] as const,
   appInfo: ["app", "info"] as const,
+  autostart: ["autostart"] as const,
+  updateCheck: ["update", "check"] as const,
   import: ["import"] as const,
   importSources: ["import", "sources"] as const,
   importScan: (source: ImportSource) => ["import", "scan", source] as const,

@@ -149,6 +149,7 @@ export interface Settings {
   notificationsEnabled: boolean;
   /** 0 means off; otherwise 300 to 14400 */
   reminderIntervalSecs: number;
+  startupHintDismissed: boolean;
 }
 
 export type LimitScope = "global" | "game";
@@ -235,6 +236,20 @@ export interface SettingsUpdate {
   importOnStartup: boolean | null;
   notificationsEnabled: boolean | null;
   reminderIntervalSecs: number | null;
+  startupHintDismissed: boolean | null;
+}
+
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  /** Release date as an ISO string, when the feed provides it */
+  date: string | null;
+  notes: string | null;
+}
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
 }
 
 export interface GameUpdate {
@@ -267,6 +282,8 @@ export type ApiEventMap = {
   "sessions-changed": null;
   "limit-reached": LimitStatus;
   reminder: Reminder;
+  "update-available": UpdateInfo;
+  "update-progress": UpdateProgress;
 };
 
 export type ApiEventName = keyof ApiEventMap;

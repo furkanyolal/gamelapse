@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import { api } from "@/api";
 import type { TrackerStatus } from "@/api";
@@ -9,6 +10,7 @@ import { formatDuration } from "@/lib/format";
 /** Subscribes to every backend event; mount once in the app shell. */
 export function useApiEvents() {
   const client = useQueryClient();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribers = [
@@ -44,6 +46,12 @@ export function useApiEvents() {
           description: `${formatDuration(reminder.elapsedSecs)} this session.`,
         }),
       ),
+      api.on("update-available", (info) => {
+        client.setQueryData(keys.updateCheck, info);
+        toast(`Gamelapse ${info.version} is available`, {
+          action: { label: "View", onClick: () => void navigate("/settings") },
+        });
+      }),
       api.on("session-updated", (active) => {
         client.setQueryData<TrackerStatus>(keys.trackerStatus, (old) => {
           if (!old) return old;
@@ -79,5 +87,5 @@ export function useApiEvents() {
       ),
     ];
     return () => unsubscribers.forEach((off) => off());
-  }, [client]);
+  }, [client, navigate]);
 }

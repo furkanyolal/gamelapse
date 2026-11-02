@@ -24,6 +24,7 @@ export function useUpdateSettings() {
         importOnStartup: null,
         notificationsEnabled: null,
         reminderIntervalSecs: null,
+        startupHintDismissed: null,
         ...patch,
       }),
     onSuccess: (settings) => {

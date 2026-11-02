@@ -63,6 +63,44 @@ describe("Dashboard", () => {
   });
 });
 
+describe("Dashboard startup hint", () => {
+  it("shows when not dismissed and autostart is off, and hides on Not now", async () => {
+    const settings = await api.getSettings();
+    vi.spyOn(api, "getSettings").mockResolvedValue({
+      ...settings,
+      startupHintDismissed: false,
+    });
+    vi.spyOn(api, "getAutostart").mockResolvedValue(false);
+    const update = vi
+      .spyOn(api, "updateSettings")
+      .mockResolvedValue({ ...settings, startupHintDismissed: true });
+    renderPage(<Dashboard />);
+    expect(
+      await screen.findByRole("region", { name: "Start with Windows" }),
+    ).toBeInTheDocument();
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "Start with Windows" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ startupHintDismissed: true }),
+    );
+  });
+
+  it("stays hidden when autostart is already on", async () => {
+    vi.spyOn(api, "getAutostart").mockResolvedValue(true);
+    renderPage(<Dashboard />);
+    expect(await screen.findByText("All time")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(
+      screen.queryByRole("region", { name: "Start with Windows" }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("Games", () => {
   it("lists games with totals and filters by search", async () => {
     renderPage(<Games />);
@@ -103,6 +141,20 @@ describe("Settings limits", () => {
     expect(screen.getByRole("button", { name: /add limit/i })).toBeEnabled();
     expect(screen.getByLabelText("Notifications")).toBeChecked();
     expect(screen.getByLabelText("Play reminder")).toBeInTheDocument();
+  });
+});
+
+describe("Settings general and updates", () => {
+  it("renders the General and Updates cards", async () => {
+    renderPage(<Settings />);
+    expect(await screen.findByText("General")).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText("Start with Windows"),
+    ).not.toBeChecked();
+    expect(screen.getByText("Updates")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Check for updates" }),
+    ).toBeEnabled();
   });
 });
 

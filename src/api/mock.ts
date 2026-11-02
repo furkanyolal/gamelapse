@@ -22,6 +22,7 @@ import type {
   SteamApiSettings,
   Tag,
   TrackerStatus,
+  UpdateInfo,
 } from "./types";
 
 export interface MockOptions {
@@ -54,6 +55,13 @@ const DEFAULT_SETTINGS: Settings = {
   importOnStartup: true,
   notificationsEnabled: true,
   reminderIntervalSecs: 0,
+  startupHintDismissed: false,
+};
+
+const MOCK_UPDATE_BASE = {
+  version: "1.1.0",
+  date: "2026-11-01T12:00:00Z",
+  notes: "Faster startup, a new stats chart and several fixes.",
 };
 
 /** The fake active session goes AFK for the last 20 s of every 90 s cycle. */
@@ -211,12 +219,22 @@ export function createMockApi(options: MockOptions = {}): Api {
   /** Last reminder multiple seen per session; the first sight is silent. */
   const reminderBuckets = new Map<number, number>();
 
+  let autostart = false;
+  let updateChecks = 0;
+
   const listeners = new Map<ApiEventName, Set<(payload: never) => void>>();
   let timer: ReturnType<typeof setInterval> | null = null;
 
   function emit<E extends ApiEventName>(event: E, payload: ApiEventMap[E]) {
     listeners.get(event)?.forEach((h) => h(payload as never));
   }
+
+  function mockUpdate(): UpdateInfo {
+    return { ...MOCK_UPDATE_BASE, currentVersion: "0.1.0-mock" };
+  }
+
+  // The silent launch check: announce an update once, about 10 s in.
+  setTimeout(() => emit("update-available", mockUpdate()), 10_000);
 
   function listenerCount() {
     let n = 0;
@@ -1014,6 +1032,9 @@ export function createMockApi(options: MockOptions = {}): Api {
         if (v !== next.reminderIntervalSecs) reminderBuckets.clear();
         next.reminderIntervalSecs = v;
       }
+      if (patch.startupHintDismissed !== null) {
+        next.startupHintDismissed = patch.startupHintDismissed;
+      }
       settings = next;
       return { ...settings };
     },
@@ -1236,6 +1257,25 @@ export function createMockApi(options: MockOptions = {}): Api {
       }
       emit("library-changed", null);
       emit("sessions-changed", null);
+      return null;
+    },
+    async getAutostart() {
+      return autostart;
+    },
+    async setAutostart(enabled) {
+      autostart = enabled;
+      return autostart;
+    },
+    async checkForUpdate() {
+      updateChecks += 1;
+      return updateChecks % 2 === 0 ? mockUpdate() : null;
+    },
+    async installUpdate() {
+      const total = 5_000_000;
+      for (let i = 1; i <= 5; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        emit("update-progress", { downloaded: (total / 5) * i, total });
+      }
       return null;
     },
     on(event, handler) {

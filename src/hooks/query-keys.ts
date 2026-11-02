@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import type { SessionQuery } from "@/api/types";
+import type { ImportSource, SessionQuery } from "@/api/types";
 
 /** Query keys from docs/contract.md; arguments go last. */
 export const keys = {
@@ -22,9 +22,21 @@ export const keys = {
   statsHourly: (days: number) => ["stats", "hourly", days] as const,
   settings: ["settings"] as const,
   appInfo: ["app", "info"] as const,
+  import: ["import"] as const,
+  importSources: ["import", "sources"] as const,
+  importScan: (source: ImportSource) => ["import", "scan", source] as const,
+  steamApi: ["steamApi"] as const,
+  steamApiSettings: ["steamApi", "settings"] as const,
 };
 
-type Family = "tracker" | "games" | "sessions" | "stats" | "settings";
+type Family =
+  | "tracker"
+  | "games"
+  | "sessions"
+  | "stats"
+  | "settings"
+  | "import"
+  | "steamApi";
 
 export function invalidateFamilies(client: QueryClient, ...families: Family[]) {
   return Promise.all(

@@ -21,6 +21,7 @@ export function useUpdateSettings() {
         requireForeground: null,
         trackingEnabled: null,
         theme: null,
+        importOnStartup: null,
         ...patch,
       }),
     onSuccess: (settings) => {

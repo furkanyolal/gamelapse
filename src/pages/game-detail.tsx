@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { GameSummary, MatchMode } from "@/api";
 import { DailyChart } from "@/components/charts";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { GameCover } from "@/components/game-cover";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/query-state";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +144,7 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
           </Link>
         </Button>
         <div className="flex flex-wrap items-center gap-3">
+          <GameCover coverPath={game.coverPath} className="h-16 w-32" />
           <h1 className="text-2xl font-semibold tracking-tight">{game.name}</h1>
           {game.hidden && <Badge variant="outline">Hidden</Badge>}
           {playing && <Badge>Playing</Badge>}
@@ -175,7 +177,7 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
         />
         {summary.importedMinutes > 0 && (
           <StatCard
-            label="Before tracking"
+            label="Imported playtime"
             value={formatDuration(summary.importedMinutes * 60)}
           />
         )}

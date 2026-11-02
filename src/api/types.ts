@@ -109,6 +109,45 @@ export interface Settings {
   requireForeground: boolean;
   trackingEnabled: boolean;
   theme: Theme;
+  importOnStartup: boolean;
+}
+
+export type ImportSource = "steam" | "epic" | "gog";
+
+export interface ImportSourceStatus {
+  source: ImportSource;
+  /** The launcher was found on this machine */
+  available: boolean;
+  /** Install path when available, otherwise why not */
+  detail: string | null;
+  lastScanAt: number | null;
+}
+
+export interface DiscoveredGame {
+  source: ImportSource;
+  sourceId: string;
+  name: string;
+  installDir: string | null;
+  /** Normalised exact executable paths known from the launcher; may be empty */
+  executables: string[];
+  /** Launcher-reported playtime, when the launcher tracks it */
+  playtimeMinutes: number | null;
+  /** A game with this source and sourceId already exists */
+  alreadyImported: boolean;
+}
+
+export interface ImportResult {
+  source: ImportSource;
+  discovered: number;
+  added: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface SteamApiSettings {
+  apiKey: string | null;
+  steamId64: string | null;
 }
 
 export interface SettingsUpdate {
@@ -118,6 +157,7 @@ export interface SettingsUpdate {
   requireForeground: boolean | null;
   trackingEnabled: boolean | null;
   theme: Theme | null;
+  importOnStartup: boolean | null;
 }
 
 export interface GameUpdate {

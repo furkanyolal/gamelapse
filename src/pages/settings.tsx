@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import type { Settings as AppSettings, Theme } from "@/api";
+import type { ImportSource, Settings as AppSettings, Theme } from "@/api";
+import { ImportDialog } from "@/components/import-dialog";
 import { PageHeader } from "@/components/page-header";
 import { ErrorState, RowsSkeleton } from "@/components/query-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,12 +26,20 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAppInfo } from "@/hooks/use-app-info";
 import {
+  useFetchSteamPlaytime,
+  useImportSources,
+  useSetSteamApiSettings,
+  useSteamApiSettings,
+} from "@/hooks/use-import";
+import {
   usePing,
   useSeedDemoData,
   useSettings,
   useUpdateSettings,
 } from "@/hooks/use-settings";
 import { useSetTrackingEnabled } from "@/hooks/use-tracker";
+import { formatRelativeShort } from "@/lib/format";
+import { SOURCE_LABELS } from "@/lib/import-sources";
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -213,6 +223,182 @@ function TrackingCard({ settings }: { settings: AppSettings }) {
   );
 }
 
+function ImportCard({ settings }: { settings: AppSettings }) {
+  const sources = useImportSources();
+  const update = useUpdateSettings();
+  const [scanSource, setScanSource] = useState<ImportSource | null>(null);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Import</CardTitle>
+        <CardDescription>
+          Add games from the launchers installed on this PC.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {sources.isPending && <RowsSkeleton rows={3} />}
+        {sources.error && (
+          <ErrorState error={sources.error} onRetry={() => sources.refetch()} />
+        )}
+        <ul className="divide-y">
+          {sources.data?.map((s) => (
+            <li key={s.source} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{SOURCE_LABELS[s.source]}</span>
+                  <Badge variant={s.available ? "secondary" : "outline"}>
+                    {s.available ? "Available" : "Not found"}
+                  </Badge>
+                </div>
+                {s.detail && (
+                  <p className="text-muted-foreground text-xs break-all">
+                    {s.detail}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Last scan: {formatRelativeShort(s.lastScanAt)}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!s.available}
+                aria-label={`Scan ${SOURCE_LABELS[s.source]}`}
+                onClick={() => setScanSource(s.source)}
+              >
+                Scan
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <SwitchRow
+          id="import-on-startup"
+          label="Import on startup"
+          description="Re-scan every available launcher when the app starts."
+          checked={settings.importOnStartup}
+          onCheckedChange={(importOnStartup) =>
+            update.mutate({ importOnStartup })
+          }
+        />
+      </CardContent>
+      {scanSource && (
+        <ImportDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setScanSource(null);
+          }}
+          initialSource={scanSource}
+        />
+      )}
+    </Card>
+  );
+}
+
+function SteamApiCard() {
+  const saved = useSteamApiSettings();
+  const save = useSetSteamApiSettings();
+  const fetchPlaytime = useFetchSteamPlaytime();
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [steamId, setSteamId] = useState<string | null>(null);
+
+  const keyValue = apiKey ?? saved.data?.apiKey ?? "";
+  const idValue = steamId ?? saved.data?.steamId64 ?? "";
+  const dirty =
+    keyValue !== (saved.data?.apiKey ?? "") ||
+    idValue !== (saved.data?.steamId64 ?? "");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Steam Web API</CardTitle>
+        <CardDescription>
+          Fetch your Steam playtime. Get a key at steamcommunity.com/dev/apikey,
+          and make sure the game details of your profile are public.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="steam-api-key">API key</Label>
+            <Input
+              id="steam-api-key"
+              type="password"
+              autoComplete="off"
+              value={keyValue}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="steam-id">SteamID64</Label>
+            <Input
+              id="steam-id"
+              inputMode="numeric"
+              autoComplete="off"
+              value={idValue}
+              onChange={(e) => setSteamId(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            disabled={!dirty || save.isPending}
+            onClick={() =>
+              save.mutate(
+                {
+                  apiKey: keyValue.trim() || null,
+                  steamId64: idValue.trim() || null,
+                },
+                {
+                  onSuccess: () => {
+                    setApiKey(null);
+                    setSteamId(null);
+                    toast.success("Steam settings saved");
+                  },
+                },
+              )
+            }
+          >
+            Save
+          </Button>
+          <Button
+            variant="outline"
+            disabled={dirty || fetchPlaytime.isPending}
+            onClick={() => fetchPlaytime.mutate()}
+          >
+            Fetch playtime
+          </Button>
+        </div>
+        {save.error && (
+          <p role="alert" className="text-destructive text-sm">
+            {save.error.message}
+          </p>
+        )}
+        {fetchPlaytime.error && (
+          <p role="alert" className="text-destructive text-sm">
+            {fetchPlaytime.error.message}
+          </p>
+        )}
+        {fetchPlaytime.data && (
+          <div className="space-y-1 text-sm">
+            <p>
+              Updated playtime for {fetchPlaytime.data.updated} of{" "}
+              {fetchPlaytime.data.discovered} Steam games.
+            </p>
+            {fetchPlaytime.data.errors.length > 0 && (
+              <ul className="text-destructive list-disc pl-5">
+                {fetchPlaytime.data.errors.map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function DeveloperCard() {
   const seed = useSeedDemoData();
   const ping = usePing();
@@ -270,6 +456,8 @@ export default function Settings() {
         <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
       )}
       {settings.data && <TrackingCard settings={settings.data} />}
+      {settings.data && <ImportCard settings={settings.data} />}
+      <SteamApiCard />
 
       <Card>
         <CardHeader>

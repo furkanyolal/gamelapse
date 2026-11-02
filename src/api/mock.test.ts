@@ -170,3 +170,83 @@ describe("mock api", () => {
     }
   });
 });
+
+describe("mock api: launcher imports", () => {
+  it("lists all three sources with Epic unavailable", async () => {
+    const api = createMockApi({ empty: true });
+    const sources = await api.listImportSources();
+    expect(sources.map((s) => s.source)).toEqual(["steam", "epic", "gog"]);
+    expect(sources.map((s) => s.available)).toEqual([true, false, true]);
+    expect(sources[1].detail).toBeTruthy();
+    await expect(api.scanImportSource("epic")).rejects.toThrow();
+  });
+
+  it("scans, imports, reports counts and marks games imported", async () => {
+    const api = createMockApi({ empty: true });
+    const onLibrary = vi.fn();
+    api.on("library-changed", onLibrary);
+
+    const first = await api.scanImportSource("steam");
+    expect(first).toHaveLength(5);
+    expect(first.filter((g) => g.alreadyImported)).toHaveLength(2);
+    expect(await api.listGames(false)).toHaveLength(0);
+
+    const result = await api.importGames("steam");
+    expect(result).toMatchObject({
+      source: "steam",
+      discovered: 5,
+      added: 3,
+      updated: 0,
+      skipped: 2,
+      errors: [],
+    });
+    expect(onLibrary).toHaveBeenCalled();
+
+    const games = await api.listGames(false);
+    expect(games).toHaveLength(3);
+    const hollow = games.find((g) => g.game.name === "Hollow Knight")!;
+    expect(hollow.game.source).toBe("steam");
+    expect(hollow.game.sourceId).toBe("367520");
+    expect(hollow.game.installDir).toContain("hollow knight");
+    expect(hollow.importedMinutes).toBe(2410);
+    const exes = await api.listGameExecutables(hollow.game.id);
+    expect(exes.map((e) => e.matchMode).sort()).toEqual([
+      "exact_path",
+      "install_dir_prefix",
+    ]);
+
+    const second = await api.scanImportSource("steam");
+    expect(second.every((g) => g.alreadyImported)).toBe(true);
+    const again = await api.importGames("steam");
+    expect(again).toMatchObject({ added: 0, updated: 3, skipped: 2 });
+
+    const gog = await api.importGames("gog");
+    expect(gog).toMatchObject({ discovered: 1, added: 1 });
+  });
+
+  it("fetchSteamPlaytime needs a key and SteamID64", async () => {
+    const api = createMockApi({ empty: true });
+    await expect(api.fetchSteamPlaytime()).rejects.toThrow(/api key/i);
+    await api.setSteamApiSettings({ apiKey: "k", steamId64: null });
+    await expect(api.fetchSteamPlaytime()).rejects.toThrow(/steamid64/i);
+
+    await api.importGames("steam");
+    await api.setSteamApiSettings({ apiKey: "k", steamId64: "7656119" });
+    expect(await api.getSteamApiSettings()).toEqual({
+      apiKey: "k",
+      steamId64: "7656119",
+    });
+    const before = (await api.listGames(false)).map((g) => g.importedMinutes);
+    const result = await api.fetchSteamPlaytime();
+    expect(result).toMatchObject({ source: "steam", updated: 3, errors: [] });
+    const after = (await api.listGames(false)).map((g) => g.importedMinutes);
+    after.forEach((m, i) => expect(m).toBeGreaterThan(before[i]));
+  });
+
+  it("gives two demo games an https cover", async () => {
+    const games = await createMockApi().listGames(false);
+    const covers = games.map((g) => g.game.coverPath).filter(Boolean);
+    expect(covers).toHaveLength(2);
+    covers.forEach((c) => expect(c).toMatch(/^https:\/\//));
+  });
+});

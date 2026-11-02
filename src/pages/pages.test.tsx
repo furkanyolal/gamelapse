@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/api";
 import Dashboard from "@/pages/dashboard";
 import Games from "@/pages/games";
+import Settings from "@/pages/settings";
 
 function renderPage(page: React.ReactNode) {
   const client = new QueryClient({
@@ -59,5 +60,32 @@ describe("Games", () => {
     await userEvent.type(screen.getByLabelText("Search games"), "hades");
     expect(screen.queryByText("Elden Ring")).not.toBeInTheDocument();
     expect(screen.getByText("Hades II")).toBeInTheDocument();
+  });
+});
+
+describe("Games import button", () => {
+  it("opens the import dialog", async () => {
+    renderPage(<Games />);
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(
+      await screen.findByRole("button", { name: /import/i }),
+    );
+    expect(await screen.findByText("Import games")).toBeInTheDocument();
+  });
+});
+
+describe("Settings", () => {
+  it("renders the Import and Steam Web API cards", async () => {
+    renderPage(<Settings />);
+    expect(await screen.findByText("Steam Web API")).toBeInTheDocument();
+    expect(
+      await screen.findByLabelText("Import on startup"),
+    ).toBeInTheDocument();
+    expect(await screen.findByText("Epic Games")).toBeInTheDocument();
+    expect(await screen.findByText("Not found")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Scan Steam" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Scan Epic Games" }),
+    ).toBeDisabled();
   });
 });

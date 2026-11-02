@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Play, Plus } from "lucide-react";
+import { Download, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { GameCover } from "@/components/game-cover";
+import { ImportDialog } from "@/components/import-dialog";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +18,7 @@ import { formatDuration, formatRelative } from "@/lib/format";
 export default function Games() {
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const games = useGames(showHidden);
   const status = useTrackerStatus();
   const addGame = useAddGameFromExe();
@@ -39,10 +42,16 @@ export default function Games() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <PageHeader title="Games" description="Your library and time played." />
-        <Button onClick={handleAdd} disabled={addGame.isPending}>
-          <Plus /> Add game
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Download /> Import
+          </Button>
+          <Button onClick={handleAdd} disabled={addGame.isPending}>
+            <Plus /> Add game
+          </Button>
+        </div>
       </div>
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <div className="flex flex-wrap items-center gap-4">
         <Input
@@ -88,6 +97,7 @@ export default function Games() {
                 key={s.game.id}
                 className="hover:bg-muted/40 flex items-center gap-4 px-4 py-3"
               >
+                <GameCover coverPath={s.game.coverPath} className="h-10 w-20" />
                 <Link
                   to={`/games/${s.game.id}`}
                   className="min-w-0 flex-1 space-y-0.5"

@@ -5,12 +5,16 @@ import type {
   AppInfo,
   DailyTotal,
   DashboardStats,
+  DiscoveredGame,
   Game,
   GameExecutable,
   GameSummary,
   GameTotal,
   GameUpdate,
   HourlyTotal,
+  ImportResult,
+  ImportSource,
+  ImportSourceStatus,
   MatchMode,
   Session,
   SessionQuery,
@@ -18,6 +22,7 @@ import type {
   SessionWithGame,
   Settings,
   SettingsUpdate,
+  SteamApiSettings,
   TrackerStatus,
 } from "./types";
 
@@ -62,6 +67,12 @@ export interface Api {
   getSettings(): Promise<Settings>;
   updateSettings(patch: SettingsUpdate): Promise<Settings>;
   seedDemoData(): Promise<null>;
+  listImportSources(): Promise<ImportSourceStatus[]>;
+  scanImportSource(source: ImportSource): Promise<DiscoveredGame[]>;
+  importGames(source: ImportSource): Promise<ImportResult>;
+  getSteamApiSettings(): Promise<SteamApiSettings>;
+  setSteamApiSettings(settings: SteamApiSettings): Promise<null>;
+  fetchSteamPlaytime(): Promise<ImportResult>;
   /** Subscribe to a backend event; returns the unsubscribe function. */
   on<E extends ApiEventName>(
     event: E,

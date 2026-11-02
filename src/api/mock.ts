@@ -9,9 +9,14 @@ import type {
   GameExecutable,
   GameSummary,
   HourlyTotal,
+  DiscoveredGame,
+  ImportResult,
+  ImportSource,
+  ImportSourceStatus,
   Session,
   SessionWithGame,
   Settings,
+  SteamApiSettings,
   TrackerStatus,
 } from "./types";
 
@@ -42,6 +47,73 @@ const DEFAULT_SETTINGS: Settings = {
   requireForeground: false,
   trackingEnabled: true,
   theme: "dark",
+  importOnStartup: true,
+};
+
+const STEAM_ROOT = "c:\\program files (x86)\\steam";
+const steamCover = (appId: string) =>
+  `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
+
+type CatalogEntry = Omit<DiscoveredGame, "alreadyImported"> & {
+  /** Counts as imported from the start, as if an earlier run had added it. */
+  preImported?: boolean;
+};
+
+function steamEntry(
+  appId: string,
+  name: string,
+  dir: string,
+  playtimeMinutes: number | null,
+  preImported = false,
+): CatalogEntry {
+  const installDir = `${STEAM_ROOT}\\steamapps\\common\\${dir.toLowerCase()}`;
+  return {
+    source: "steam",
+    sourceId: appId,
+    name,
+    installDir,
+    executables: [
+      `${installDir}\\${dir.toLowerCase().replaceAll(" ", "")}.exe`,
+    ],
+    playtimeMinutes,
+    preImported,
+  };
+}
+
+const IMPORT_CATALOG: Record<ImportSource, CatalogEntry[]> = {
+  steam: [
+    steamEntry("620", "Portal 2", "Portal 2", 1260, true),
+    steamEntry("550", "Left 4 Dead 2", "Left 4 Dead 2", 3480, true),
+    steamEntry("367520", "Hollow Knight", "Hollow Knight", 2410),
+    steamEntry("632470", "Disco Elysium", "Disco Elysium", 1875),
+    steamEntry("105600", "Terraria", "Terraria", null),
+  ],
+  epic: [],
+  gog: [
+    {
+      source: "gog",
+      sourceId: "1423049311",
+      name: "Cyberpunk 2077",
+      installDir: "c:\\gog games\\cyberpunk 2077",
+      executables: [
+        "c:\\gog games\\cyberpunk 2077\\bin\\x64\\cyberpunk2077.exe",
+      ],
+      playtimeMinutes: 5400,
+    },
+  ],
+};
+
+const IMPORT_AVAILABILITY: Record<
+  ImportSource,
+  { available: boolean; detail: string }
+> = {
+  steam: { available: true, detail: "C:\\Program Files (x86)\\Steam" },
+  epic: {
+    available: false,
+    detail:
+      "Epic Games Launcher not found (no manifests in C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests)",
+  },
+  gog: { available: true, detail: "C:\\Program Files (x86)\\GOG Galaxy" },
 };
 
 /** Small deterministic PRNG. */
@@ -100,6 +172,13 @@ export function createMockApi(options: MockOptions = {}): Api {
   let nextExeId = 1;
   let nextSessionId = 1;
   let pickCounter = 0;
+  const importedMinutes = new Map<number, number>();
+  const lastScanAt: Record<ImportSource, number | null> = {
+    steam: null,
+    epic: null,
+    gog: null,
+  };
+  let steamApi: SteamApiSettings = { apiKey: null, steamId64: null };
 
   const listeners = new Map<ApiEventName, Set<(payload: never) => void>>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -181,8 +260,85 @@ export function createMockApi(options: MockOptions = {}): Api {
       lastPlayedAt: own.length
         ? Math.max(...own.map((s) => s.startedAt))
         : null,
-      importedMinutes: 0,
+      importedMinutes: importedMinutes.get(game.id) ?? 0,
     };
+  }
+
+  function findImported(source: ImportSource, sourceId: string) {
+    return games.find((g) => g.source === source && g.sourceId === sourceId);
+  }
+
+  function requireAvailable(source: ImportSource) {
+    const { available, detail } = IMPORT_AVAILABILITY[source];
+    if (!available) throw new Error(detail);
+  }
+
+  function discover(source: ImportSource): DiscoveredGame[] {
+    requireAvailable(source);
+    return IMPORT_CATALOG[source].map(
+      ({ preImported, ...entry }): DiscoveredGame => ({
+        ...entry,
+        executables: [...entry.executables],
+        alreadyImported:
+          findImported(source, entry.sourceId) !== undefined ||
+          preImported === true,
+      }),
+    );
+  }
+
+  function importOf(source: ImportSource): ImportResult {
+    const found = discover(source);
+    const result: ImportResult = {
+      source,
+      discovered: found.length,
+      added: 0,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    };
+    for (const d of found) {
+      const existing = findImported(source, d.sourceId);
+      if (existing) {
+        existing.installDir = d.installDir;
+        if (d.playtimeMinutes !== null) {
+          importedMinutes.set(existing.id, d.playtimeMinutes);
+        }
+        result.updated += 1;
+        continue;
+      }
+      if (d.alreadyImported) {
+        result.skipped += 1;
+        continue;
+      }
+      const game = insertGame(d.name, {
+        source,
+        sourceId: d.sourceId,
+        installDir: d.installDir,
+        coverPath: source === "steam" ? steamCover(d.sourceId) : null,
+      });
+      if (d.installDir) {
+        executables.push({
+          id: nextExeId++,
+          gameId: game.id,
+          exePath: d.installDir,
+          matchMode: "install_dir_prefix",
+        });
+      }
+      for (const exe of d.executables) {
+        executables.push({
+          id: nextExeId++,
+          gameId: game.id,
+          exePath: exe,
+          matchMode: "exact_path",
+        });
+      }
+      if (d.playtimeMinutes !== null) {
+        importedMinutes.set(game.id, d.playtimeMinutes);
+      }
+      result.added += 1;
+    }
+    lastScanAt[source] = now();
+    return result;
   }
 
   function requireGame(gameId: number): Game {
@@ -228,6 +384,12 @@ export function createMockApi(options: MockOptions = {}): Api {
       const game = insertGame(g.name, {
         sourceId: `demo-${i + 1}`,
         installDir: dir,
+        coverPath:
+          i === 0
+            ? steamCover("1245620")
+            : i === 4
+              ? steamCover("1086940")
+              : null,
         createdAt: now() - 60 * DAY,
       });
       executables.push({
@@ -425,6 +587,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       games = games.filter((g) => g.id !== gameId);
       executables = executables.filter((e) => e.gameId !== gameId);
       sessions = sessions.filter((s) => s.gameId !== gameId);
+      importedMinutes.delete(gameId);
       emit("library-changed", null);
       return null;
     },
@@ -611,6 +774,9 @@ export function createMockApi(options: MockOptions = {}): Api {
         next.trackingEnabled = patch.trackingEnabled;
       }
       if (patch.theme !== null) next.theme = patch.theme;
+      if (patch.importOnStartup !== null) {
+        next.importOnStartup = patch.importOnStartup;
+      }
       settings = next;
       return { ...settings };
     },
@@ -620,6 +786,64 @@ export function createMockApi(options: MockOptions = {}): Api {
       emit("library-changed", null);
       emit("sessions-changed", null);
       return null;
+    },
+    async listImportSources() {
+      return (["steam", "epic", "gog"] as const).map<ImportSourceStatus>(
+        (source) => ({
+          source,
+          available: IMPORT_AVAILABILITY[source].available,
+          detail: IMPORT_AVAILABILITY[source].detail,
+          lastScanAt: lastScanAt[source],
+        }),
+      );
+    },
+    async scanImportSource(source) {
+      const found = discover(source);
+      lastScanAt[source] = now();
+      return found;
+    },
+    async importGames(source) {
+      const result = importOf(source);
+      emit("library-changed", null);
+      return result;
+    },
+    async getSteamApiSettings() {
+      return { ...steamApi };
+    },
+    async setSteamApiSettings(next) {
+      steamApi = {
+        apiKey: next.apiKey?.trim() || null,
+        steamId64: next.steamId64?.trim() || null,
+      };
+      return null;
+    },
+    async fetchSteamPlaytime() {
+      if (!steamApi.apiKey) {
+        throw new Error("Set a Steam Web API key before fetching playtime.");
+      }
+      if (!steamApi.steamId64) {
+        throw new Error("Set your SteamID64 before fetching playtime.");
+      }
+      const owned = games.filter((g) => g.source === "steam");
+      for (const g of owned) {
+        const base = IMPORT_CATALOG.steam.find(
+          (e) => e.sourceId === g.sourceId,
+        );
+        importedMinutes.set(
+          g.id,
+          Math.max(importedMinutes.get(g.id) ?? 0, base?.playtimeMinutes ?? 0) +
+            60,
+        );
+      }
+      emit("library-changed", null);
+      return {
+        source: "steam",
+        discovered: owned.length,
+        added: 0,
+        updated: owned.length,
+        skipped: 0,
+        errors: [],
+      };
     },
     on(event, handler) {
       let set = listeners.get(event);

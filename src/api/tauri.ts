@@ -49,6 +49,13 @@ export function createTauriApi(): Api {
     getSettings: () => call("get_settings"),
     updateSettings: (patch) => call("update_settings", { patch }),
     seedDemoData: () => call("seed_demo_data"),
+    listImportSources: () => call("list_import_sources"),
+    scanImportSource: (source) => call("scan_import_source", { source }),
+    importGames: (source) => call("import_games", { source }),
+    getSteamApiSettings: () => call("get_steam_api_settings"),
+    setSteamApiSettings: (settings) =>
+      call("set_steam_api_settings", { settings }),
+    fetchSteamPlaytime: () => call("fetch_steam_playtime"),
     on: (event, handler) => {
       // listen() is async; unsubscribe even if it is called before it resolves.
       let cancelled = false;

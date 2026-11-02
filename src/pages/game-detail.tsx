@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowLeft, Pencil, Play, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Merge, Pencil, Play, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import type { GameSummary, MatchMode } from "@/api";
 import { DailyChart } from "@/components/charts";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { GameCover } from "@/components/game-cover";
+import { CoverCard, MergeDialog, TagsCard } from "@/components/game-management";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/query-state";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -131,6 +132,7 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [matchMode, setMatchMode] = useState<MatchMode>("exact_path");
 
   const playing = status.data?.active.some((a) => a.gameId === game.id);
@@ -151,6 +153,9 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
           <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={() => setRenameOpen(true)}>
               <Pencil /> Rename
+            </Button>
+            <Button variant="outline" onClick={() => setMergeOpen(true)}>
+              <Merge /> Merge games
             </Button>
             <Button
               variant="outline"
@@ -182,6 +187,9 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
           />
         )}
       </div>
+
+      <TagsCard summary={summary} />
+      <CoverCard summary={summary} />
 
       <Card>
         <CardHeader>
@@ -329,6 +337,9 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
         </CardContent>
       </Card>
 
+      {mergeOpen && (
+        <MergeDialog open onOpenChange={setMergeOpen} summary={summary} />
+      )}
       {renameOpen && (
         <RenameDialog open onOpenChange={setRenameOpen} summary={summary} />
       )}

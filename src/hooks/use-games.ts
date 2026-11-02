@@ -34,6 +34,35 @@ function useLibraryMutation<TVars, TData>(fn: (vars: TVars) => Promise<TData>) {
   });
 }
 
+function useManagementMutation<TVars, TData>(
+  fn: (vars: TVars) => Promise<TData>,
+) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: () =>
+      invalidateFamilies(client, "games", "sessions", "stats", "limits"),
+  });
+}
+
+export function useMergeGames(survivorId: number) {
+  return useManagementMutation((mergedIds: number[]) =>
+    api.mergeGames(survivorId, mergedIds),
+  );
+}
+
+/** Picks an image with the native dialog, then sets it as the cover. */
+export function useChooseCover(gameId: number) {
+  return useManagementMutation(async () => {
+    const path = await api.pickImage();
+    return path === null ? null : api.setGameCover(gameId, path);
+  });
+}
+
+export function useClearCover(gameId: number) {
+  return useManagementMutation(() => api.setGameCover(gameId, null));
+}
+
 /** Picks an executable with the native dialog, then creates the game. */
 export function useAddGameFromExe() {
   return useLibraryMutation(async (name: string | null) => {

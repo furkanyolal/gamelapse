@@ -60,6 +60,19 @@ export function createTauriApi(): Api {
     createLimit: (input) => call("create_limit", { input }),
     updateLimit: (limitId, input) => call("update_limit", { limitId, input }),
     deleteLimit: (limitId) => call("delete_limit", { limitId }),
+    listTags: () => call("list_tags"),
+    createTag: (name) => call("create_tag", { name }),
+    renameTag: (tagId, name) => call("rename_tag", { tagId, name }),
+    deleteTag: (tagId) => call("delete_tag", { tagId }),
+    setGameTags: (gameId, tagIds) => call("set_game_tags", { gameId, tagIds }),
+    mergeGames: (survivorId, mergedIds) =>
+      call("merge_games", { survivorId, mergedIds }),
+    pickImage: () => call("pick_image"),
+    setGameCover: (gameId, sourcePath) =>
+      call("set_game_cover", { gameId, sourcePath }),
+    exportData: (options) => call("export_data", { options }),
+    backupDatabase: () => call("backup_database"),
+    restoreDatabase: () => call("restore_database"),
     on: (event, handler) => {
       // listen() is async; unsubscribe even if it is called before it resolves.
       let cancelled = false;

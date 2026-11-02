@@ -1,5 +1,10 @@
 import type {
   ActiveSession,
+  BackupInfo,
+  ExportOptions,
+  ExportResult,
+  MergeResult,
+  Tag,
   ApiEventMap,
   ApiEventName,
   AppInfo,
@@ -80,6 +85,17 @@ export interface Api {
   createLimit(input: LimitInput): Promise<Limit>;
   updateLimit(limitId: number, input: LimitInput): Promise<Limit>;
   deleteLimit(limitId: number): Promise<null>;
+  listTags(): Promise<Tag[]>;
+  createTag(name: string): Promise<Tag>;
+  renameTag(tagId: number, name: string): Promise<Tag>;
+  deleteTag(tagId: number): Promise<null>;
+  setGameTags(gameId: number, tagIds: number[]): Promise<Tag[]>;
+  mergeGames(survivorId: number, mergedIds: number[]): Promise<MergeResult>;
+  pickImage(): Promise<string | null>;
+  setGameCover(gameId: number, sourcePath: string | null): Promise<Game>;
+  exportData(options: ExportOptions): Promise<ExportResult | null>;
+  backupDatabase(): Promise<BackupInfo | null>;
+  restoreDatabase(): Promise<null>;
   /** Subscribe to a backend event; returns the unsubscribe function. */
   on<E extends ApiEventName>(
     event: E,

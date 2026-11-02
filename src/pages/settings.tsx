@@ -3,6 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type {
+  ExportFormat,
   ImportSource,
   Limit,
   Settings as AppSettings,
@@ -35,6 +36,11 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAppInfo } from "@/hooks/use-app-info";
+import {
+  useBackupDatabase,
+  useExportData,
+  useRestoreDatabase,
+} from "@/hooks/use-data";
 import { useGames } from "@/hooks/use-games";
 import { useDeleteLimit, useLimits } from "@/hooks/use-limits";
 import {
@@ -453,6 +459,184 @@ function ImportCard({ settings }: { settings: AppSettings }) {
   );
 }
 
+type PeriodPreset = "all" | "30d" | "90d" | "year";
+
+const PERIODS: { value: PeriodPreset; label: string }[] = [
+  { value: "all", label: "All time" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
+  { value: "year", label: "This year" },
+];
+
+function periodStart(preset: PeriodPreset): number | null {
+  const nowSecs = Math.floor(Date.now() / 1000);
+  switch (preset) {
+    case "30d":
+      return nowSecs - 30 * 86_400;
+    case "90d":
+      return nowSecs - 90 * 86_400;
+    case "year":
+      return Math.floor(
+        new Date(new Date().getFullYear(), 0, 1).getTime() / 1000,
+      );
+    default:
+      return null;
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function DataCard() {
+  const games = useGames(true);
+  const exportData = useExportData();
+  const backup = useBackupDatabase();
+  const restore = useRestoreDatabase();
+  const [format, setFormat] = useState<ExportFormat>("csv");
+  const [period, setPeriod] = useState<PeriodPreset>("all");
+  const [gameId, setGameId] = useState("all");
+  const [restoreOpen, setRestoreOpen] = useState(false);
+
+  const error = exportData.error ?? backup.error ?? restore.error;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Data</CardTitle>
+        <CardDescription>
+          Export your sessions, back up the database or restore a backup.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium">Export sessions</h3>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="export-format">Format</Label>
+              <Select
+                value={format}
+                onValueChange={(v) => setFormat(v as ExportFormat)}
+              >
+                <SelectTrigger id="export-format" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="csv">CSV</SelectItem>
+                  <SelectItem value="json">JSON</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="export-period">Period</Label>
+              <Select
+                value={period}
+                onValueChange={(v) => setPeriod(v as PeriodPreset)}
+              >
+                <SelectTrigger id="export-period" className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERIODS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="export-game">Game</Label>
+              <Select value={gameId} onValueChange={setGameId}>
+                <SelectTrigger id="export-game" className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All games</SelectItem>
+                  {games.data?.map((g) => (
+                    <SelectItem key={g.game.id} value={String(g.game.id)}>
+                      {g.game.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              disabled={exportData.isPending}
+              onClick={() =>
+                exportData.mutate(
+                  {
+                    format,
+                    from: periodStart(period),
+                    to: null,
+                    gameId: gameId === "all" ? null : Number(gameId),
+                  },
+                  {
+                    onSuccess: (r) => {
+                      if (r) {
+                        toast.success(`Exported ${r.sessions} sessions`, {
+                          description: r.path,
+                        });
+                      }
+                    },
+                  },
+                )
+              }
+            >
+              Export
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            disabled={backup.isPending}
+            onClick={() =>
+              backup.mutate(undefined, {
+                onSuccess: (b) => {
+                  if (b) {
+                    toast.success("Backup saved", {
+                      description: `${b.path} (${formatBytes(b.sizeBytes)})`,
+                    });
+                  }
+                },
+              })
+            }
+          >
+            Back up now
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={restore.isPending}
+            onClick={() => setRestoreOpen(true)}
+          >
+            Restore from backup
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error.message}
+          </p>
+        )}
+      </CardContent>
+      <ConfirmDialog
+        open={restoreOpen}
+        onOpenChange={setRestoreOpen}
+        title="Restore from a backup?"
+        description="Your current data is replaced by the backup you pick. The current database is kept next to it as gametimetracker.db.bak. Stop any running session first."
+        confirmLabel="Choose backup and restore"
+        onConfirm={() =>
+          restore.mutate(undefined, {
+            onSuccess: () => toast.success("Backup restored"),
+          })
+        }
+      />
+    </Card>
+  );
+}
+
 function SteamApiCard() {
   const saved = useSteamApiSettings();
   const save = useSetSteamApiSettings();
@@ -617,6 +801,7 @@ export default function Settings() {
       {settings.data && <LimitsCard settings={settings.data} />}
       {settings.data && <ImportCard settings={settings.data} />}
       <SteamApiCard />
+      <DataCard />
 
       <Card>
         <CardHeader>

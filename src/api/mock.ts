@@ -20,6 +20,7 @@ import type {
   SessionWithGame,
   Settings,
   SteamApiSettings,
+  Tag,
   TrackerStatus,
 } from "./types";
 
@@ -61,6 +62,9 @@ const AFK_SECS = 20;
 const REPEAT_NOTICE_SECS = 15 * 60;
 const MIN_LIMIT_SECS = 60;
 const MAX_LIMIT_SECS = 86_400;
+const MAX_TAG_LEN = 40;
+const MOCK_COVER_URL =
+  "https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/header.jpg";
 
 type StoredLimit = Omit<Limit, "gameName">;
 
@@ -187,6 +191,9 @@ export function createMockApi(options: MockOptions = {}): Api {
   let nextSessionId = 1;
   let pickCounter = 0;
   const importedMinutes = new Map<number, number>();
+  let tags: Tag[] = [];
+  let nextTagId = 1;
+  const gameTags = new Map<number, Set<number>>();
   const lastScanAt: Record<ImportSource, number | null> = {
     steam: null,
     epic: null,
@@ -330,11 +337,36 @@ export function createMockApi(options: MockOptions = {}): Api {
     return { ...view(s), gameName: gameName(s.gameId) };
   }
 
+  function sortedTags(list: Tag[]): Tag[] {
+    return [...list]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((t) => ({ ...t }));
+  }
+
+  function tagsOf(gameId: number): Tag[] {
+    const ids = gameTags.get(gameId);
+    return sortedTags(tags.filter((t) => ids?.has(t.id)));
+  }
+
+  function checkedTagName(raw: string, selfId: number | null): string {
+    const name = raw.trim();
+    if (!name) throw new Error("Tag name cannot be empty");
+    if (name.length > MAX_TAG_LEN) {
+      throw new Error(`Tag name must be at most ${MAX_TAG_LEN} characters`);
+    }
+    const lower = name.toLowerCase();
+    if (tags.some((t) => t.id !== selfId && t.name.toLowerCase() === lower)) {
+      throw new Error(`A tag named "${name}" already exists`);
+    }
+    return name;
+  }
+
   function summaryOf(game: Game): GameSummary {
     const own = sessions.filter((s) => s.gameId === game.id);
     const today = localMidnight(now());
     return {
       game: { ...game },
+      tags: tagsOf(game.id),
       totalSecs: own.reduce((n, s) => n + durationOf(s), 0),
       todaySecs: sumWithin(own, today, Infinity),
       weekSecs: sumWithin(own, localMidnight(now(), -6), Infinity),
@@ -482,6 +514,24 @@ export function createMockApi(options: MockOptions = {}): Api {
       });
       return game;
     });
+    if (tags.length === 0) {
+      const [rpg, coop, backlog] = ["RPG", "Co-op", "Backlog"].map((name) => {
+        const tag: Tag = { id: nextTagId++, name };
+        tags.push(tag);
+        return tag;
+      });
+      const assign: [number, Tag[]][] = [
+        [0, [rpg]],
+        [1, [rpg]],
+        [3, [coop]],
+        [4, [rpg, coop]],
+        [5, [backlog]],
+        [7, [rpg, backlog]],
+      ];
+      for (const [i, list] of assign) {
+        gameTags.set(demo[i].id, new Set(list.map((t) => t.id)));
+      }
+    }
     const totalWeight = DEMO_GAMES.reduce((n, g) => n + g.weight, 0);
     const pickGame = () => {
       let pick = rng() * totalWeight;
@@ -762,6 +812,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       sessions = sessions.filter((s) => s.gameId !== gameId);
       limits = limits.filter((l) => l.gameId !== gameId);
       importedMinutes.delete(gameId);
+      gameTags.delete(gameId);
       emit("library-changed", null);
       return null;
     },
@@ -1057,6 +1108,135 @@ export function createMockApi(options: MockOptions = {}): Api {
       limits = limits.filter((l) => l.id !== limitId);
       reachedLimits.delete(limitId);
       lastLimitNoticeAt.delete(limitId);
+      return null;
+    },
+    async listTags() {
+      return sortedTags(tags);
+    },
+    async createTag(name) {
+      const tag: Tag = { id: nextTagId++, name: checkedTagName(name, null) };
+      tags.push(tag);
+      emit("library-changed", null);
+      return { ...tag };
+    },
+    async renameTag(tagId, name) {
+      const tag = tags.find((t) => t.id === tagId);
+      if (!tag) throw new Error(`Tag ${tagId} not found`);
+      tag.name = checkedTagName(name, tagId);
+      emit("library-changed", null);
+      return { ...tag };
+    },
+    async deleteTag(tagId) {
+      if (!tags.some((t) => t.id === tagId)) {
+        throw new Error(`Tag ${tagId} not found`);
+      }
+      tags = tags.filter((t) => t.id !== tagId);
+      gameTags.forEach((ids) => ids.delete(tagId));
+      emit("library-changed", null);
+      return null;
+    },
+    async setGameTags(gameId, tagIds) {
+      requireGame(gameId);
+      const unknown = tagIds.find((id) => !tags.some((t) => t.id === id));
+      if (unknown !== undefined) throw new Error(`Tag ${unknown} not found`);
+      gameTags.set(gameId, new Set(tagIds));
+      emit("library-changed", null);
+      return tagsOf(gameId);
+    },
+    async mergeGames(survivorId, mergedIds) {
+      requireGame(survivorId);
+      if (mergedIds.includes(survivorId)) {
+        throw new Error("The game to keep cannot also be merged into itself");
+      }
+      const ids = [...new Set(mergedIds)];
+      ids.forEach(requireGame);
+      for (const id of ids) {
+        if (activeSessions().some((s) => s.gameId === id)) {
+          throw new Error(`Stop the active session of ${gameName(id)} first`);
+        }
+      }
+      let mergedSessions = 0;
+      let mergedExecutables = 0;
+      for (const id of ids) {
+        for (const s of sessions) {
+          if (s.gameId === id) {
+            s.gameId = survivorId;
+            mergedSessions += 1;
+          }
+        }
+        for (const e of executables.filter((x) => x.gameId === id)) {
+          const dup = executables.some(
+            (x) =>
+              x.gameId === survivorId &&
+              x.exePath === e.exePath &&
+              x.matchMode === e.matchMode,
+          );
+          if (!dup) {
+            e.gameId = survivorId;
+            mergedExecutables += 1;
+          }
+        }
+        const own = gameTags.get(survivorId) ?? new Set<number>();
+        gameTags.get(id)?.forEach((t) => own.add(t));
+        gameTags.set(survivorId, own);
+        const minutes = importedMinutes.get(id);
+        if (minutes !== undefined) {
+          importedMinutes.set(
+            survivorId,
+            Math.max(importedMinutes.get(survivorId) ?? 0, minutes),
+          );
+        }
+      }
+      games = games.filter((g) => !ids.includes(g.id));
+      executables = executables.filter((e) => !ids.includes(e.gameId));
+      limits = limits.filter(
+        (l) => l.gameId === null || !ids.includes(l.gameId),
+      );
+      ids.forEach((id) => {
+        gameTags.delete(id);
+        importedMinutes.delete(id);
+      });
+      emit("library-changed", null);
+      emit("sessions-changed", null);
+      return { survivorId, mergedSessions, mergedExecutables };
+    },
+    async pickImage() {
+      return MOCK_COVER_URL;
+    },
+    async setGameCover(gameId, sourcePath) {
+      const game = requireGame(gameId);
+      game.coverPath = sourcePath;
+      emit("library-changed", null);
+      return { ...game };
+    },
+    async exportData(options) {
+      const picked = sessions.filter(
+        (s) =>
+          (options.gameId === null || s.gameId === options.gameId) &&
+          (options.from === null || s.startedAt >= options.from) &&
+          (options.to === null || s.startedAt < options.to),
+      );
+      const stamp = format(new Date(now() * 1000), "yyyyMMdd");
+      return {
+        path: `C:\\Users\\mock\\Documents\\gametimetracker-sessions-${stamp}.${options.format}`,
+        sessions: picked.length,
+        games: new Set(picked.map((s) => s.gameId)).size,
+      };
+    },
+    async backupDatabase() {
+      const stamp = format(new Date(now() * 1000), "yyyyMMdd-HHmm");
+      return {
+        path: `C:\\Users\\mock\\Documents\\gametimetracker-backup-${stamp}.db`,
+        createdAt: now(),
+        sizeBytes: 262_144 + sessions.length * 96,
+      };
+    },
+    async restoreDatabase() {
+      if (activeSessions().length > 0) {
+        throw new Error("Stop the active sessions before restoring a backup");
+      }
+      emit("library-changed", null);
+      emit("sessions-changed", null);
       return null;
     },
     on(event, handler) {

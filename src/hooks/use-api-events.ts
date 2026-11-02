@@ -64,7 +64,15 @@ export function useApiEvents() {
         invalidateFamilies(client, "tracker", "settings"),
       ),
       api.on("library-changed", () =>
-        invalidateFamilies(client, "games", "sessions", "stats", "import"),
+        invalidateFamilies(
+          client,
+          "games",
+          "sessions",
+          "stats",
+          "import",
+          "tags",
+          "limits",
+        ),
       ),
       api.on("sessions-changed", () =>
         invalidateFamilies(client, "sessions", "games", "stats"),

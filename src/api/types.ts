@@ -66,8 +66,44 @@ export interface TrackerStatus {
   lastPollAt: number | null;
 }
 
+export interface Tag {
+  id: number;
+  name: string;
+}
+
+export interface MergeResult {
+  survivorId: number;
+  mergedSessions: number;
+  mergedExecutables: number;
+}
+
+export type ExportFormat = "csv" | "json";
+
+export interface ExportOptions {
+  format: ExportFormat;
+  /** inclusive lower bound on startedAt */
+  from: number | null;
+  /** exclusive upper bound on startedAt */
+  to: number | null;
+  gameId: number | null;
+}
+
+export interface ExportResult {
+  path: string;
+  sessions: number;
+  games: number;
+}
+
+export interface BackupInfo {
+  path: string;
+  createdAt: number;
+  sizeBytes: number;
+}
+
 export interface GameSummary {
   game: Game;
+  /** Sorted by name */
+  tags: Tag[];
   totalSecs: number;
   todaySecs: number;
   weekSecs: number;

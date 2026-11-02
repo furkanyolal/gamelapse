@@ -29,6 +29,8 @@ export const keys = {
   steamApiSettings: ["steamApi", "settings"] as const,
   limits: ["limits"] as const,
   limitsList: ["limits", "list"] as const,
+  tags: ["tags"] as const,
+  tagsList: ["tags", "list"] as const,
 };
 
 type Family =
@@ -39,7 +41,8 @@ type Family =
   | "settings"
   | "import"
   | "steamApi"
-  | "limits";
+  | "limits"
+  | "tags";
 
 export function invalidateFamilies(client: QueryClient, ...families: Family[]) {
   return Promise.all(

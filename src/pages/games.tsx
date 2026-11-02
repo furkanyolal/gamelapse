@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAddGameFromExe, useGames } from "@/hooks/use-games";
+import { useTags } from "@/hooks/use-tags";
 import { useStartManualSession, useTrackerStatus } from "@/hooks/use-tracker";
 import { formatDuration, formatRelative } from "@/lib/format";
 
@@ -24,11 +25,23 @@ export default function Games() {
   const addGame = useAddGameFromExe();
   const start = useStartManualSession();
 
+  const tags = useTags();
+  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+
   const activeIds = new Set(status.data?.active.map((a) => a.gameId));
   const needle = search.trim().toLowerCase();
-  const visible = games.data?.filter((g) =>
-    g.game.name.toLowerCase().includes(needle),
+  const visible = games.data?.filter(
+    (g) =>
+      g.game.name.toLowerCase().includes(needle) &&
+      (selectedTags.length === 0 ||
+        g.tags.some((t) => selectedTags.includes(t.id))),
   );
+
+  function toggleTag(id: number) {
+    setSelectedTags((cur) =>
+      cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id],
+    );
+  }
 
   function handleAdd() {
     addGame.mutate(null, {
@@ -72,6 +85,37 @@ export default function Games() {
         </div>
       </div>
 
+      {tags.data && tags.data.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filter by tag"
+        >
+          <Button
+            size="sm"
+            variant={selectedTags.length === 0 ? "default" : "outline"}
+            aria-pressed={selectedTags.length === 0}
+            onClick={() => setSelectedTags([])}
+          >
+            All
+          </Button>
+          {tags.data.map((t) => {
+            const on = selectedTags.includes(t.id);
+            return (
+              <Button
+                key={t.id}
+                size="sm"
+                variant={on ? "default" : "outline"}
+                aria-pressed={on}
+                onClick={() => toggleTag(t.id)}
+              >
+                {t.name}
+              </Button>
+            );
+          })}
+        </div>
+      )}
+
       {games.isPending && <RowsSkeleton rows={6} />}
       {games.error && (
         <ErrorState error={games.error} onRetry={() => games.refetch()} />
@@ -106,6 +150,11 @@ export default function Games() {
                     <span className="truncate font-medium">{s.game.name}</span>
                     {s.game.hidden && <Badge variant="outline">Hidden</Badge>}
                     {activeIds.has(s.game.id) && <Badge>Playing</Badge>}
+                    {s.tags.map((t) => (
+                      <Badge key={t.id} variant="secondary">
+                        {t.name}
+                      </Badge>
+                    ))}
                   </div>
                   <p className="text-muted-foreground text-xs">
                     Last played {formatRelative(s.lastPlayedAt)} ·{" "}

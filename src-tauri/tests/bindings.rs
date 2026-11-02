@@ -2,5 +2,5 @@
 
 #[test]
 fn export_typescript_bindings() {
-    gametimetracker_lib::export_bindings(&gametimetracker_lib::specta_builder());
+    gamelapse_lib::export_bindings(&gamelapse_lib::specta_builder());
 }

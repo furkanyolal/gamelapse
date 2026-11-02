@@ -2,10 +2,10 @@ mod common;
 
 use chrono::NaiveDate;
 use common::{BAR_EXE, FOO_EXE, TrackRig, add_game};
-use gametimetracker_lib::core::db::{repo, stats};
-use gametimetracker_lib::core::limits;
-use gametimetracker_lib::core::tracker::TrackerEvent;
-use gametimetracker_lib::core::types::{
+use gamelapse_lib::core::db::{repo, stats};
+use gamelapse_lib::core::limits;
+use gamelapse_lib::core::tracker::TrackerEvent;
+use gamelapse_lib::core::types::{
     LimitAction, LimitInput, LimitScope, MatchMode, Reminder, SessionSource, Settings,
 };
 
@@ -361,7 +361,7 @@ fn a_reopened_session_does_not_replay_past_reminders() {
 fn reminder_interval_validation() {
     let ok = |secs| {
         Settings::default()
-            .with_update(&gametimetracker_lib::core::types::SettingsUpdate {
+            .with_update(&gamelapse_lib::core::types::SettingsUpdate {
                 reminder_interval_secs: Some(secs),
                 ..Default::default()
             })

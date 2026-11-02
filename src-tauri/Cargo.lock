@@ -1148,7 +1148,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gametimetracker"
+name = "gamelapse"
 version = "0.1.0"
 dependencies = [
  "anyhow",

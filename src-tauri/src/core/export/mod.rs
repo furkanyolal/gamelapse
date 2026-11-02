@@ -32,14 +32,14 @@ pub fn extension(format: ExportFormat) -> &'static str {
     }
 }
 
-/// `gametimetracker-sessions-<YYYYMMDD>.<ext>`, dated by the local day of `now`.
+/// `gamelapse-sessions-<YYYYMMDD>.<ext>`, dated by the local day of `now`.
 pub fn default_file_name(format: ExportFormat, now: i64) -> String {
     let day = Local
         .timestamp_opt(now, 0)
         .earliest()
         .unwrap_or_else(Local::now)
         .format("%Y%m%d");
-    format!("gametimetracker-sessions-{day}.{}", extension(format))
+    format!("gamelapse-sessions-{day}.{}", extension(format))
 }
 
 /// Local ISO 8601 with offset, for example `2026-11-02T20:15:00+03:00`.

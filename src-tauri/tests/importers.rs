@@ -6,13 +6,13 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use common::test_db;
-use gametimetracker_lib::core::db::repo;
-use gametimetracker_lib::core::importers::epic::{self, EpicImporter};
-use gametimetracker_lib::core::importers::gog::{self, GogImporter};
-use gametimetracker_lib::core::importers::registry::{Hive, Registry};
-use gametimetracker_lib::core::importers::steam::{self, SteamImporter};
-use gametimetracker_lib::core::importers::{Importer, covers, mark_imported, steam_api, store};
-use gametimetracker_lib::core::types::{
+use gamelapse_lib::core::db::repo;
+use gamelapse_lib::core::importers::epic::{self, EpicImporter};
+use gamelapse_lib::core::importers::gog::{self, GogImporter};
+use gamelapse_lib::core::importers::registry::{Hive, Registry};
+use gamelapse_lib::core::importers::steam::{self, SteamImporter};
+use gamelapse_lib::core::importers::{Importer, covers, mark_imported, steam_api, store};
+use gamelapse_lib::core::types::{
     DiscoveredGame, GameSource, GameUpdate, ImportSource, MatchMode, SteamApiSettings,
 };
 use rusqlite::Connection;
@@ -489,11 +489,11 @@ fn import(
     games: &[DiscoveredGame],
     covers: &HashMap<String, String>,
     now: i64,
-) -> gametimetracker_lib::core::types::ImportResult {
+) -> gamelapse_lib::core::types::ImportResult {
     store::import_games(conn, ImportSource::Steam, games, covers, vec![], now).unwrap()
 }
 
-fn find(conn: &Connection, id: &str) -> gametimetracker_lib::core::types::Game {
+fn find(conn: &Connection, id: &str) -> gamelapse_lib::core::types::Game {
     repo::list_games(conn, true)
         .unwrap()
         .into_iter()
@@ -656,11 +656,11 @@ fn import_sets_cover_once_and_marks_imported() {
     assert!(games[0].already_imported);
     assert!(!games[1].already_imported);
     assert_eq!(
-        gametimetracker_lib::core::importers::last_scan_at(&conn, ImportSource::Steam).unwrap(),
+        gamelapse_lib::core::importers::last_scan_at(&conn, ImportSource::Steam).unwrap(),
         Some(1)
     );
     assert_eq!(
-        gametimetracker_lib::core::importers::last_scan_at(&conn, ImportSource::Gog).unwrap(),
+        gamelapse_lib::core::importers::last_scan_at(&conn, ImportSource::Gog).unwrap(),
         None
     );
 }
@@ -791,7 +791,7 @@ fn steam_api_playtime_updates_existing_games_only() {
 #[test]
 #[ignore]
 fn live_steam_scan() {
-    let importer = gametimetracker_lib::core::importers::importer_for(ImportSource::Steam);
+    let importer = gamelapse_lib::core::importers::importer_for(ImportSource::Steam);
     let status = importer.status();
     println!("status: {status:?}");
     let scan = importer.scan().unwrap();

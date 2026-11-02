@@ -47,7 +47,7 @@ export function AppShell() {
       <ThemeSync />
       <Sidebar collapsible="none" className="border-r">
         <SidebarHeader className="px-4 py-4 text-base font-semibold">
-          GameTimeTracker
+          Gamelapse
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>

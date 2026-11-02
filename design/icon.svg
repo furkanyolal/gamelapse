@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2f8f"/><stop offset="1" stop-color="#6b8cff"/></linearGradient>
+<mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+<rect width="1024" height="1024" fill="#fff"/>
+<circle cx="512" cy="470" r="135" fill="#000"/>
+<path d="M300 430h40v-40h44v40h40v44h-40v40h-44v-40h-40z" fill="#000" transform="translate(-60 -10)"/>
+<circle cx="692" cy="430" r="32" fill="#000"/>
+<circle cx="760" cy="500" r="32" fill="#000"/>
+</mask>
+</defs>
+<rect x="82" y="82" width="860" height="860" rx="189" fill="url(#bg)"/>
+<g mask="url(#cut)" fill="#fff">
+<rect x="172" y="300" width="680" height="330" rx="165"/>
+<path d="M200 520 L330 520 L300 760 Q285 800 235 790 Q175 780 165 720 Z"/>
+<path d="M824 520 L694 520 L724 760 Q739 800 789 790 Q849 780 859 720 Z"/>
+</g>
+<path d="M512 395V470H570" fill="none" stroke="#fff" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

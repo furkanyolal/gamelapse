@@ -625,7 +625,7 @@ function DataCard() {
         open={restoreOpen}
         onOpenChange={setRestoreOpen}
         title="Restore from a backup?"
-        description="Your current data is replaced by the backup you pick. The current database is kept next to it as gametimetracker.db.bak. Stop any running session first."
+        description="Your current data is replaced by the backup you pick. The current database is kept next to it as gamelapse.db.bak. Stop any running session first."
         confirmLabel="Choose backup and restore"
         onConfirm={() =>
           restore.mutate(undefined, {
@@ -806,9 +806,7 @@ export default function Settings() {
       <Card>
         <CardHeader>
           <CardTitle>About</CardTitle>
-          <CardDescription>
-            Where GameTimeTracker keeps its data.
-          </CardDescription>
+          <CardDescription>Where Gamelapse keeps its data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {info.isPending && <RowsSkeleton rows={2} />}

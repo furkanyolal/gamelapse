@@ -89,7 +89,7 @@ pub fn export_bindings(builder: &tauri_specta::Builder<tauri::Wry>) {
 
 fn init_logging(log_dir: &std::path::Path) -> anyhow::Result<LogGuard> {
     std::fs::create_dir_all(log_dir)?;
-    let appender = tracing_appender::rolling::daily(log_dir, "gametimetracker.log");
+    let appender = tracing_appender::rolling::daily(log_dir, "gamelapse.log");
     let (writer, guard) = tracing_appender::non_blocking(appender);
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let file_layer = tracing_subscriber::fmt::layer()
@@ -112,7 +112,7 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(app, &[&open, &quit])?;
 
     let mut tray = TrayIconBuilder::with_id("main")
-        .tooltip("GameTimeTracker")
+        .tooltip("Gamelapse")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -169,8 +169,21 @@ pub fn run() {
             let guard = init_logging(&log_dir)?;
             app.manage(guard);
 
-            let db_path = data_dir.join("gametimetracker.db");
-            tracing::info!(data_dir = %data_dir.display(), db_path = %db_path.display(), "starting GameTimeTracker");
+            if let Some(roaming) = data_dir.parent() {
+                let legacy_dir = roaming.join(core::migrate_legacy::LEGACY_IDENTIFIER);
+                match core::migrate_legacy::migrate_legacy_data(&legacy_dir, &data_dir) {
+                    Ok(true) => tracing::info!(
+                        from = %legacy_dir.display(),
+                        to = %data_dir.display(),
+                        "migrated data from the GameTimeTracker folder"
+                    ),
+                    Ok(false) => {}
+                    Err(e) => tracing::error!(error = %e, "legacy data migration failed"),
+                }
+            }
+
+            let db_path = data_dir.join("gamelapse.db");
+            tracing::info!(data_dir = %data_dir.display(), db_path = %db_path.display(), "starting Gamelapse");
             let conn = core::db::open(&db_path)?;
             match core::tracker::recover_crashed_sessions(&conn) {
                 Ok(0) => {}

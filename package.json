@@ -1,5 +1,5 @@
 {
-  "name": "gametimetracker",
+  "name": "gamelapse",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^7.0.1",

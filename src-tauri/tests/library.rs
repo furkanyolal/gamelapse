@@ -1,11 +1,11 @@
 mod common;
 
 use common::{add_game, test_db};
-use gametimetracker_lib::core::db::{library, repo, stats};
-use gametimetracker_lib::core::types::{MatchMode, SessionSource};
+use gamelapse_lib::core::db::{library, repo, stats};
+use gamelapse_lib::core::types::{MatchMode, SessionSource};
 use rusqlite::params;
 
-fn tag_names(tags: &[gametimetracker_lib::core::types::Tag]) -> Vec<&str> {
+fn tag_names(tags: &[gamelapse_lib::core::types::Tag]) -> Vec<&str> {
     tags.iter().map(|t| t.name.as_str()).collect()
 }
 

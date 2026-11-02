@@ -6,6 +6,7 @@ pub mod export;
 pub mod idle;
 pub mod importers;
 pub mod limits;
+pub mod migrate_legacy;
 pub mod settings;
 pub mod tracker;
 pub mod types;

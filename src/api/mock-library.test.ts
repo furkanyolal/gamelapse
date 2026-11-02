@@ -109,7 +109,7 @@ describe("mock export, backup and restore", () => {
     const sessions = await api.listSessions(allSessions);
     expect(all?.sessions).toBe(sessions.length);
     expect(all?.games).toBe(new Set(sessions.map((s) => s.gameId)).size);
-    expect(all?.path).toMatch(/gametimetracker-sessions-\d{8}\.csv$/);
+    expect(all?.path).toMatch(/gamelapse-sessions-\d{8}\.csv$/);
 
     const gameId = sessions[0].gameId;
     const one = await api.exportData({

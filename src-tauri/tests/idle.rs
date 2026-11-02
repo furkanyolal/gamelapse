@@ -1,4 +1,4 @@
-use gametimetracker_lib::core::idle::{IdleSource, WinIdleSource, ticks_since};
+use gamelapse_lib::core::idle::{IdleSource, WinIdleSource, ticks_since};
 
 #[test]
 fn tick_arithmetic_survives_the_32_bit_wrap() {

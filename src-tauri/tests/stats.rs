@@ -2,8 +2,8 @@ mod common;
 
 use chrono::NaiveDate;
 use common::{add_game, test_db};
-use gametimetracker_lib::core::db::{repo, seed, stats};
-use gametimetracker_lib::core::types::{MatchMode, SessionSource};
+use gamelapse_lib::core::db::{repo, seed, stats};
+use gamelapse_lib::core::types::{MatchMode, SessionSource};
 
 fn date(y: i32, m: u32, d: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(y, m, d).unwrap()

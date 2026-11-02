@@ -27,7 +27,7 @@ fn err(msg: impl Into<String>) -> AppError {
     AppError::Other(msg.into())
 }
 
-/// `<path><suffix>`, for example `gametimetracker.db` + `.bak`.
+/// `<path><suffix>`, for example `gamelapse.db` + `.bak`.
 fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name: OsString = path.as_os_str().to_owned();
     name.push(suffix);
@@ -69,13 +69,11 @@ pub fn validate_backup(path: &Path) -> AppResult<()> {
         )
         .map_err(|e| err(format!("that file is not a valid backup: {e}")))?;
     if !has_games {
-        return Err(err("that file is not a GameTimeTracker backup"));
+        return Err(err("that file is not a Gamelapse backup"));
     }
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
     if version > migrations::count() as i64 {
-        return Err(err(
-            "that backup was made by a newer version of GameTimeTracker",
-        ));
+        return Err(err("that backup was made by a newer version of Gamelapse"));
     }
     Ok(())
 }

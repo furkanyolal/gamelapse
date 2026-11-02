@@ -9,8 +9,8 @@
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "$APPDATA/com.furkanyolal.gametimetracker" },
-        { "path": "$APPDATA/com.furkanyolal.gametimetracker/**" }
+        { "path": "$APPDATA/com.furkanyolal.gamelapse" },
+        { "path": "$APPDATA/com.furkanyolal.gamelapse/**" }
       ]
     },
     "notification:default",

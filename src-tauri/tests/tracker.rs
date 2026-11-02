@@ -1,9 +1,9 @@
 mod common;
 
 use common::{FakeClock, FakeSource, add_game, test_db};
-use gametimetracker_lib::core::db::repo;
-use gametimetracker_lib::core::tracker::{Tracker, TrackerEvent, matches};
-use gametimetracker_lib::core::types::{
+use gamelapse_lib::core::db::repo;
+use gamelapse_lib::core::tracker::{Tracker, TrackerEvent, matches};
+use gamelapse_lib::core::types::{
     GameExecutable, MatchMode, SessionQuery, SessionSource, Settings,
 };
 
@@ -18,9 +18,7 @@ fn exe(path: &str, mode: MatchMode) -> GameExecutable {
     }
 }
 
-fn all_sessions(
-    conn: &rusqlite::Connection,
-) -> Vec<gametimetracker_lib::core::types::SessionWithGame> {
+fn all_sessions(conn: &rusqlite::Connection) -> Vec<gamelapse_lib::core::types::SessionWithGame> {
     repo::list_sessions(
         conn,
         &SessionQuery {
@@ -86,7 +84,7 @@ impl Rig {
     }
 
     fn tick(&mut self, t: i64) -> Vec<TrackerEvent> {
-        use gametimetracker_lib::core::tracker::ProcessSource;
+        use gamelapse_lib::core::tracker::ProcessSource;
         self.clock.set(t);
         let mut source = self.source.clone();
         self.tracker
@@ -303,7 +301,7 @@ fn crash_recovery_closes_open_sessions_at_last_heartbeat() {
     let without_beat =
         repo::insert_session(&conn, game, 500, None, SessionSource::Manual, None).unwrap();
 
-    let closed = gametimetracker_lib::core::tracker::recover_crashed_sessions(&conn).unwrap();
+    let closed = gamelapse_lib::core::tracker::recover_crashed_sessions(&conn).unwrap();
     assert_eq!(closed, 2);
     let a = repo::get_session(&conn, with_beat.id, 9999).unwrap();
     assert_eq!((a.ended_at, a.duration_secs), (Some(160), 60));
@@ -325,7 +323,7 @@ fn stopping_a_running_auto_session_is_not_undone_by_the_next_poll() {
 }
 
 fn steam_game(rig: &Rig, app_id: &str) -> i32 {
-    use gametimetracker_lib::core::types::GameSource;
+    use gamelapse_lib::core::types::GameSource;
     repo::insert_game(
         &rig.conn,
         "Steam Game",
@@ -340,7 +338,7 @@ fn steam_game(rig: &Rig, app_id: &str) -> i32 {
 
 #[test]
 fn matched_games_steam_signal() {
-    use gametimetracker_lib::core::tracker::{Snapshot, matched_games};
+    use gamelapse_lib::core::tracker::{Snapshot, matched_games};
     let snap = Snapshot {
         processes: vec![],
         foreground: None,
@@ -354,7 +352,7 @@ fn matched_games_steam_signal() {
 
 #[test]
 fn snapshot_detects_steam_exe_by_name() {
-    use gametimetracker_lib::core::tracker::Snapshot;
+    use gamelapse_lib::core::tracker::Snapshot;
     let with = |p: &str| Snapshot {
         processes: vec![p.to_string()],
         ..Snapshot::default()

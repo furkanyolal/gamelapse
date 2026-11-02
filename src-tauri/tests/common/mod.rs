@@ -3,10 +3,10 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use gametimetracker_lib::core::db::{migrations, repo};
-use gametimetracker_lib::core::idle::IdleReading;
-use gametimetracker_lib::core::tracker::{Clock, ProcessSource, Snapshot, Tracker, TrackerEvent};
-use gametimetracker_lib::core::types::{ActiveSession, GameSource, MatchMode, Session, Settings};
+use gamelapse_lib::core::db::{migrations, repo};
+use gamelapse_lib::core::idle::IdleReading;
+use gamelapse_lib::core::tracker::{Clock, ProcessSource, Snapshot, Tracker, TrackerEvent};
+use gamelapse_lib::core::types::{ActiveSession, GameSource, MatchMode, Session, Settings};
 use rusqlite::Connection;
 
 pub fn test_db() -> Connection {

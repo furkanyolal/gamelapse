@@ -1,4 +1,4 @@
-use gametimetracker_lib::core::db::migrations;
+use gamelapse_lib::core::db::migrations;
 use rusqlite::Connection;
 
 #[test]

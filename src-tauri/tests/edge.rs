@@ -1,9 +1,9 @@
 mod common;
 
 use common::{BAR_EXE, FOO_EXE, add_game, test_db};
-use gametimetracker_lib::core::db::{library, repo};
-use gametimetracker_lib::core::limits;
-use gametimetracker_lib::core::types::{
+use gamelapse_lib::core::db::{library, repo};
+use gamelapse_lib::core::limits;
+use gamelapse_lib::core::types::{
     LimitAction, LimitInput, LimitScope, MatchMode, SessionQuery, SessionSource,
 };
 

@@ -4,9 +4,9 @@ use std::path::Path;
 
 use chrono::{Local, SecondsFormat, TimeZone};
 use common::{add_game, test_db};
-use gametimetracker_lib::core::db::{self, migrations, repo};
-use gametimetracker_lib::core::types::{ExportFormat, ExportOptions, MatchMode, SessionSource};
-use gametimetracker_lib::core::{custom_covers, export};
+use gamelapse_lib::core::db::{self, migrations, repo};
+use gamelapse_lib::core::types::{ExportFormat, ExportOptions, MatchMode, SessionSource};
+use gamelapse_lib::core::{custom_covers, export};
 use rusqlite::Connection;
 use serde_json::Value;
 
@@ -128,7 +128,7 @@ fn json_export_has_games_and_sessions() {
 fn default_export_names_follow_the_contract() {
     let name = export::default_file_name(ExportFormat::Csv, NOW);
     let day = Local.timestamp_opt(NOW, 0).unwrap().format("%Y%m%d");
-    assert_eq!(name, format!("gametimetracker-sessions-{day}.csv"));
+    assert_eq!(name, format!("gamelapse-sessions-{day}.csv"));
     assert!(export::default_file_name(ExportFormat::Json, NOW).ends_with(".json"));
 }
 
@@ -163,7 +163,7 @@ fn make_old_backup(path: &Path) {
 fn backup_then_restore_round_trips_and_migrates() {
     assert!(migrations::count() > 1, "needs a migration to bump");
     let dir = tempfile::tempdir().unwrap();
-    let live_path = dir.path().join("gametimetracker.db");
+    let live_path = dir.path().join("gamelapse.db");
     let old = dir.path().join("old.db");
     make_old_backup(&old);
 
@@ -201,7 +201,7 @@ fn backup_then_restore_round_trips_and_migrates() {
     assert_eq!(on, 1);
 
     // The previous database was kept.
-    let bak = dir.path().join("gametimetracker.db.bak");
+    let bak = dir.path().join("gamelapse.db.bak");
     assert!(bak.exists());
     assert_eq!(session_count(&Connection::open(&bak).unwrap()), 1);
 
@@ -214,7 +214,7 @@ fn backup_then_restore_round_trips_and_migrates() {
 #[test]
 fn restore_rejects_invalid_files_and_keeps_the_live_database() {
     let dir = tempfile::tempdir().unwrap();
-    let live_path = dir.path().join("gametimetracker.db");
+    let live_path = dir.path().join("gamelapse.db");
     let mut live = db::open(&live_path).unwrap();
     let game = add_game(&live, "Current", r"c:\c.exe", MatchMode::ExactPath);
     repo::insert_session(&live, game, 1, Some(2), SessionSource::Manual, None).unwrap();
@@ -236,7 +236,7 @@ fn restore_rejects_invalid_files_and_keeps_the_live_database() {
         assert!(db::replace_database(&mut live, &live_path, bad).is_err());
         assert_eq!(session_count(&live), 1);
     }
-    assert!(!dir.path().join("gametimetracker.db.bak").exists());
+    assert!(!dir.path().join("gamelapse.db.bak").exists());
 }
 
 #[test]

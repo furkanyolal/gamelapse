@@ -707,10 +707,9 @@ export function createMockApi(options: MockOptions = {}): Api {
     async getAppInfo() {
       return {
         version: "0.1.0-mock",
-        dataDir: "C:\\Users\\mock\\AppData\\Roaming\\GameTimeTracker",
-        dbPath:
-          "C:\\Users\\mock\\AppData\\Roaming\\GameTimeTracker\\gametimetracker.db",
-        logDir: "C:\\Users\\mock\\AppData\\Roaming\\GameTimeTracker\\logs",
+        dataDir: "C:\\Users\\mock\\AppData\\Roaming\\Gamelapse",
+        dbPath: "C:\\Users\\mock\\AppData\\Roaming\\Gamelapse\\gamelapse.db",
+        logDir: "C:\\Users\\mock\\AppData\\Roaming\\Gamelapse\\logs",
       };
     },
     async ping() {
@@ -1218,7 +1217,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       );
       const stamp = format(new Date(now() * 1000), "yyyyMMdd");
       return {
-        path: `C:\\Users\\mock\\Documents\\gametimetracker-sessions-${stamp}.${options.format}`,
+        path: `C:\\Users\\mock\\Documents\\gamelapse-sessions-${stamp}.${options.format}`,
         sessions: picked.length,
         games: new Set(picked.map((s) => s.gameId)).size,
       };
@@ -1226,7 +1225,7 @@ export function createMockApi(options: MockOptions = {}): Api {
     async backupDatabase() {
       const stamp = format(new Date(now() * 1000), "yyyyMMdd-HHmm");
       return {
-        path: `C:\\Users\\mock\\Documents\\gametimetracker-backup-${stamp}.db`,
+        path: `C:\\Users\\mock\\Documents\\gamelapse-backup-${stamp}.db`,
         createdAt: now(),
         sizeBytes: 262_144 + sessions.length * 96,
       };

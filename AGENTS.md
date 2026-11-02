@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guide for coding agents working on GameTimeTracker (Tauri 2 + React + TypeScript, Windows only).
+Guide for coding agents working on Gamelapse (Tauri 2 + React + TypeScript, Windows only).
 
 ## Layout
 

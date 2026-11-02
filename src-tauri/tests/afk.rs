@@ -1,9 +1,9 @@
 mod common;
 
 use common::TrackRig;
-use gametimetracker_lib::core::db::{repo, stats};
-use gametimetracker_lib::core::idle::IdleReading;
-use gametimetracker_lib::core::types::GameUpdate;
+use gamelapse_lib::core::db::{repo, stats};
+use gamelapse_lib::core::idle::IdleReading;
+use gamelapse_lib::core::types::GameUpdate;
 
 fn session_id(rig: &TrackRig) -> i32 {
     repo::active_session_for_game(&rig.conn, rig.game)
@@ -191,7 +191,7 @@ fn duration_and_stats_exclude_afk_for_active_and_ended_sessions() {
     );
     let listed = repo::list_sessions(
         &rig.conn,
-        &gametimetracker_lib::core::types::SessionQuery {
+        &gamelapse_lib::core::types::SessionQuery {
             game_id: None,
             from: None,
             to: None,

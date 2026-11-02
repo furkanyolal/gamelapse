@@ -68,7 +68,7 @@ pub async fn backup_database(
         .earliest()
         .unwrap_or_else(Local::now)
         .format("%Y%m%d-%H%M");
-    let name = format!("gametimetracker-backup-{stamp}.db");
+    let name = format!("gamelapse-backup-{stamp}.db");
     let Some(path) = pick_save_path(app, name, "Database", &["db"]).await? else {
         return Ok(None);
     };

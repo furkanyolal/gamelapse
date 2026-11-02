@@ -217,6 +217,7 @@ fn steam(id: &str, name: &str) -> DiscoveredGame {
         executables: vec![],
         playtime_minutes: None,
         already_imported: false,
+        ignored: false,
         game_source: None,
     }
 }

@@ -87,6 +87,16 @@ CREATE TABLE scan_roots (
 );
 ";
 
+const V5: &str = "
+CREATE TABLE ignored_imports (
+  source TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  ignored_at INTEGER NOT NULL,
+  PRIMARY KEY (source, source_id)
+);
+";
+
 /// Marks Steam rows imported before the "known tools" rule. Generated from `KNOWN_TOOLS`, so
 /// the list lives in one place; the SQL is frozen at what that list was for this release.
 fn v4() -> String {
@@ -103,7 +113,7 @@ fn v4() -> String {
 /// The ordered list of migrations. Append only; never edit a released migration.
 fn scripts() -> &'static [String] {
     static SCRIPTS: OnceLock<Vec<String>> = OnceLock::new();
-    SCRIPTS.get_or_init(|| vec![V1.into(), V2.into(), V3.into(), v4()])
+    SCRIPTS.get_or_init(|| vec![V1.into(), V2.into(), V3.into(), v4(), V5.into()])
 }
 
 pub fn migrations() -> Migrations<'static> {

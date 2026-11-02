@@ -481,6 +481,7 @@ fn discovered(id: &str, name: &str, dir: Option<&str>, minutes: Option<i64>) -> 
         executables: vec![],
         playtime_minutes: minutes,
         already_imported: false,
+        ignored: false,
         game_source: None,
     }
 }
@@ -807,4 +808,119 @@ fn live_steam_scan() {
     }
     println!("{} games", scan.games.len());
     assert!(scan.games.iter().all(|g| g.source_id != "228980"));
+}
+
+// ------------------------------------------------------- ignored imports
+
+fn game_id(conn: &Connection, id: &str) -> i32 {
+    find(conn, id).id
+}
+
+#[test]
+fn deleting_an_imported_game_writes_a_tombstone_and_a_manual_one_does_not() {
+    let conn = test_db();
+    import(
+        &conn,
+        &[discovered("10", "Counter-Strike", None, None)],
+        &HashMap::new(),
+        100,
+    );
+    let manual =
+        repo::insert_game(&conn, "Hand Added", GameSource::Manual, None, None, 100).unwrap();
+
+    repo::delete_game(&conn, game_id(&conn, "10"), 500).unwrap();
+    repo::delete_game(&conn, manual.id, 600).unwrap();
+
+    let ignored = repo::list_ignored_imports(&conn).unwrap();
+    assert_eq!(ignored.len(), 1);
+    assert_eq!(ignored[0].source, GameSource::Steam);
+    assert_eq!(ignored[0].source_id, "10");
+    assert_eq!(ignored[0].name, "Counter-Strike");
+    assert_eq!(ignored[0].ignored_at, 500);
+}
+
+#[test]
+fn list_ignored_imports_is_newest_first() {
+    let conn = test_db();
+    import(
+        &conn,
+        &[
+            discovered("1", "A", None, None),
+            discovered("2", "B", None, None),
+        ],
+        &HashMap::new(),
+        100,
+    );
+    repo::delete_game(&conn, game_id(&conn, "1"), 200).unwrap();
+    repo::delete_game(&conn, game_id(&conn, "2"), 300).unwrap();
+    let ids: Vec<_> = repo::list_ignored_imports(&conn)
+        .unwrap()
+        .into_iter()
+        .map(|i| i.source_id)
+        .collect();
+    assert_eq!(ids, ["2", "1"]);
+}
+
+#[test]
+fn an_import_skips_a_tombstoned_game_and_scan_marks_it_ignored() {
+    let conn = test_db();
+    let games = [
+        discovered("10", "Counter-Strike", None, Some(60)),
+        discovered("20", "Portal", None, None),
+    ];
+    import(&conn, &games, &HashMap::new(), 100);
+    repo::delete_game(&conn, game_id(&conn, "10"), 200).unwrap();
+
+    let result = import(&conn, &games, &HashMap::new(), 300);
+    assert_eq!((result.discovered, result.added, result.skipped), (2, 0, 2));
+    assert!(
+        repo::list_games(&conn, true)
+            .unwrap()
+            .iter()
+            .all(|g| g.source_id.as_deref() != Some("10"))
+    );
+
+    let mut preview = games.to_vec();
+    mark_imported(&conn, &mut preview).unwrap();
+    assert!(preview[0].ignored && !preview[0].already_imported);
+    assert!(!preview[1].ignored && preview[1].already_imported);
+}
+
+#[test]
+fn restoring_an_ignored_import_lets_the_next_import_add_it_again() {
+    let conn = test_db();
+    let games = [discovered("10", "Counter-Strike", None, None)];
+    import(&conn, &games, &HashMap::new(), 100);
+    repo::delete_game(&conn, game_id(&conn, "10"), 200).unwrap();
+
+    assert!(repo::restore_ignored_import(&conn, GameSource::Steam, "10").unwrap());
+    assert!(repo::list_ignored_imports(&conn).unwrap().is_empty());
+    let result = import(&conn, &games, &HashMap::new(), 300);
+    assert_eq!(result.added, 1);
+    assert_eq!(find(&conn, "10").name, "Counter-Strike");
+}
+
+#[test]
+fn fetch_steam_playtime_ignores_tombstoned_app_ids() {
+    let conn = test_db();
+    import(
+        &conn,
+        &[
+            discovered("10", "Counter-Strike", None, None),
+            discovered("20", "Portal", None, None),
+        ],
+        &HashMap::new(),
+        100,
+    );
+    repo::delete_game(&conn, game_id(&conn, "10"), 200).unwrap();
+
+    let owned = vec![("10".to_string(), 120), ("20".to_string(), 30)];
+    let result = steam_api::apply_owned_games(&conn, &owned, 300).unwrap();
+    assert_eq!((result.updated, result.skipped), (1, 1));
+    assert!(
+        repo::list_games(&conn, true)
+            .unwrap()
+            .iter()
+            .all(|g| g.source_id.as_deref() != Some("10"))
+    );
 }

@@ -4,7 +4,8 @@ use rusqlite::{Connection, params};
 use serde::Deserialize;
 
 use super::store::set_imported_playtime;
-use crate::core::types::{ImportResult, ImportSource, SteamApiSettings};
+use crate::core::db::repo::is_ignored_import;
+use crate::core::types::{GameSource, ImportResult, ImportSource, SteamApiSettings};
 use crate::error::{AppError, AppResult};
 
 const ENDPOINT: &str = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/";
@@ -103,6 +104,10 @@ pub fn apply_owned_games(
     let tx = conn.unchecked_transaction()?;
     let (mut updated, mut skipped) = (0, 0);
     for (app_id, minutes) in owned {
+        if is_ignored_import(&tx, GameSource::Steam, app_id)? {
+            skipped += 1;
+            continue;
+        }
         let id: Option<i32> = {
             use rusqlite::OptionalExtension;
             tx.query_row(

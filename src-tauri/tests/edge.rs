@@ -13,13 +13,13 @@ fn deleting_a_game_with_an_active_session_is_rejected() {
     let game = add_game(&conn, "Foo", FOO_EXE, MatchMode::ExactPath);
     repo::insert_session(&conn, game, 1000, None, SessionSource::Manual, None).unwrap();
 
-    assert!(repo::delete_game(&conn, game).is_err());
+    assert!(repo::delete_game(&conn, game, 1500).is_err());
     assert!(repo::get_game(&conn, game).is_ok());
 
     // Once the session is over the game can go, and its sessions with it.
     let open = repo::active_session_for_game(&conn, game).unwrap().unwrap();
     repo::end_session(&conn, open.id, 2000).unwrap();
-    repo::delete_game(&conn, game).unwrap();
+    repo::delete_game(&conn, game, 2500).unwrap();
     assert!(repo::get_game(&conn, game).is_err());
     assert!(repo::get_session(&conn, open.id, 3000).is_err());
 }

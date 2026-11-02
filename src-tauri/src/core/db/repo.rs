@@ -4,8 +4,8 @@
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
 use crate::core::types::{
-    Game, GameExecutable, GameSource, GameUpdate, MatchMode, Session, SessionQuery, SessionSource,
-    SessionUpdate, SessionWithGame,
+    Game, GameExecutable, GameSource, GameUpdate, IgnoredImport, MatchMode, Session, SessionQuery,
+    SessionSource, SessionUpdate, SessionWithGame,
 };
 use crate::error::{AppError, AppResult};
 
@@ -135,13 +135,66 @@ pub fn set_cover_path(conn: &Connection, id: i32, cover_path: Option<&str>) -> A
     get_game(conn, id)
 }
 
-pub fn delete_game(conn: &Connection, id: i32) -> AppResult<()> {
-    get_game(conn, id)?;
+/// Deletes a game. One that came from a launcher (has a `source_id`) leaves a tombstone in
+/// `ignored_imports`, so the next import does not bring it back.
+pub fn delete_game(conn: &Connection, id: i32, now: i64) -> AppResult<()> {
+    let game = get_game(conn, id)?;
     if active_session_for_game(conn, id)?.is_some() {
         return Err(err("game has an active session; stop it first"));
     }
-    conn.execute("DELETE FROM games WHERE id = ?1", [id])?;
+    let tx = conn.unchecked_transaction()?;
+    if let Some(source_id) = &game.source_id {
+        tx.execute(
+            "INSERT INTO ignored_imports (source, source_id, name, ignored_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(source, source_id) DO UPDATE SET name = excluded.name, ignored_at = excluded.ignored_at",
+            params![game.source.as_str(), source_id, game.name, now],
+        )?;
+    }
+    tx.execute("DELETE FROM games WHERE id = ?1", [id])?;
+    tx.commit()?;
     Ok(())
+}
+
+/// Tombstones, newest first.
+pub fn list_ignored_imports(conn: &Connection) -> AppResult<Vec<IgnoredImport>> {
+    let mut stmt = conn.prepare(
+        "SELECT source, source_id, name, ignored_at FROM ignored_imports
+         ORDER BY ignored_at DESC, rowid DESC",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        let source: String = r.get(0)?;
+        Ok(IgnoredImport {
+            source: GameSource::parse(&source).unwrap_or(GameSource::Manual),
+            source_id: r.get(1)?,
+            name: r.get(2)?,
+            ignored_at: r.get(3)?,
+        })
+    })?;
+    Ok(rows.collect::<Result<_, _>>()?)
+}
+
+/// Removes a tombstone. True when a row existed.
+pub fn restore_ignored_import(
+    conn: &Connection,
+    source: GameSource,
+    source_id: &str,
+) -> AppResult<bool> {
+    let n = conn.execute(
+        "DELETE FROM ignored_imports WHERE source = ?1 AND source_id = ?2",
+        params![source.as_str(), source_id],
+    )?;
+    Ok(n > 0)
+}
+
+/// Whether `(source, source_id)` is tombstoned.
+pub fn is_ignored_import(
+    conn: &Connection,
+    source: GameSource,
+    source_id: &str,
+) -> AppResult<bool> {
+    Ok(conn
+        .prepare_cached("SELECT 1 FROM ignored_imports WHERE source = ?1 AND source_id = ?2")?
+        .exists(params![source.as_str(), source_id])?)
 }
 
 /// The Steam game with this app id, if it is in the library.

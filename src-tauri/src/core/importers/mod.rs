@@ -55,12 +55,15 @@ pub fn importer_for(source: ImportSource) -> Box<dyn Importer> {
     }
 }
 
-/// Sets `already_imported` on games that exist in the library.
+/// Sets `already_imported` on games that exist in the library and `ignored` on tombstoned ones.
 pub fn mark_imported(conn: &Connection, games: &mut [DiscoveredGame]) -> AppResult<()> {
     let mut stmt = conn.prepare("SELECT 1 FROM games WHERE source = ?1 AND source_id = ?2")?;
+    let mut ignored =
+        conn.prepare("SELECT 1 FROM ignored_imports WHERE source = ?1 AND source_id = ?2")?;
     for game in games {
         game.already_imported =
             stmt.exists(params![game.library_source().as_str(), game.source_id])?;
+        game.ignored = ignored.exists(params![game.library_source().as_str(), game.source_id])?;
     }
     Ok(())
 }

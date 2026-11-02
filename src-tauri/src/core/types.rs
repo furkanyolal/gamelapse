@@ -112,6 +112,17 @@ pub struct Game {
     pub created_at: i64,
 }
 
+/// A launcher game the user deleted; imports skip it until it is restored.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct IgnoredImport {
+    pub source: GameSource,
+    pub source_id: String,
+    pub name: String,
+    #[specta(type = specta_typescript::Number)]
+    pub ignored_at: i64,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GameExecutable {
@@ -372,6 +383,9 @@ pub struct DiscoveredGame {
     pub playtime_minutes: Option<i64>,
     /// A game with this source and sourceId already exists.
     pub already_imported: bool,
+    /// The user deleted this game earlier; imports skip it until it is restored.
+    #[serde(default)]
+    pub ignored: bool,
     /// Library source when it differs from the launcher's own (Heroic: epic, gog, amazon or
     /// manual). Internal; not part of the IPC type.
     #[serde(skip)]

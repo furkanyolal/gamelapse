@@ -37,6 +37,8 @@ export const commands = {
 	getSteamApiSettings: () => typedError<SteamApiSettings_Serialize, string>(__TAURI_INVOKE("get_steam_api_settings")),
 	setSteamApiSettings: (settings: SteamApiSettings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("set_steam_api_settings", { settings })),
 	fetchSteamPlaytime: () => typedError<ImportResult, string>(__TAURI_INVOKE("fetch_steam_playtime")),
+	listIgnoredImports: () => typedError<IgnoredImport[], string>(__TAURI_INVOKE("list_ignored_imports")),
+	restoreIgnoredImport: (source: GameSource, sourceId: string) => typedError<null, string>(__TAURI_INVOKE("restore_ignored_import", { source, sourceId })),
 	listLimits: () => typedError<LimitStatus_Serialize[], string>(__TAURI_INVOKE("list_limits")),
 	createLimit: (input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("create_limit", { input })),
 	updateLimit: (limitId: number, input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("update_limit", { limitId, input })),
@@ -146,6 +148,8 @@ export type DiscoveredGame_Deserialize = {
 	playtimeMinutes?: number | null,
 	/**  A game with this source and sourceId already exists. */
 	alreadyImported: boolean,
+	/**  The user deleted this game earlier; imports skip it until it is restored. */
+	ignored?: boolean,
 };
 
 export type DiscoveredGame_Serialize = {
@@ -159,6 +163,8 @@ export type DiscoveredGame_Serialize = {
 	playtimeMinutes: number | null,
 	/**  A game with this source and sourceId already exists. */
 	alreadyImported: boolean,
+	/**  The user deleted this game earlier; imports skip it until it is restored. */
+	ignored: boolean,
 };
 
 export type ExeCandidate = {
@@ -286,6 +292,14 @@ export type Game_Serialize = {
 export type HourlyTotal = {
 	hour: number,
 	totalSecs: number,
+};
+
+/**  A launcher game the user deleted; imports skip it until it is restored. */
+export type IgnoredImport = {
+	source: GameSource,
+	sourceId: string,
+	name: string,
+	ignoredAt: number,
 };
 
 export type ImportResult = {

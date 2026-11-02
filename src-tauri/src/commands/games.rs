@@ -92,7 +92,7 @@ pub fn delete_game(app: AppHandle, state: State<'_, AppState>, game_id: i32) -> 
         // Holding the tracker lock keeps a poll from starting a session mid-delete.
         let _tracker = state.tracker();
         let db = state.db();
-        repo::delete_game(&db, game_id)?;
+        repo::delete_game(&db, game_id, now())?;
     }
     emit_library_changed(&app);
     Ok(())

@@ -61,6 +61,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::imports::get_steam_api_settings,
         commands::imports::set_steam_api_settings,
         commands::imports::fetch_steam_playtime,
+        commands::imports::list_ignored_imports,
+        commands::imports::restore_ignored_import,
         commands::limits::list_limits,
         commands::limits::create_limit,
         commands::limits::update_limit,

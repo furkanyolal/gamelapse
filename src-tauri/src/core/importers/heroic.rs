@@ -461,6 +461,7 @@ impl Importer for HeroicImporter {
                 executables: f.executables,
                 playtime_minutes: playtime.get(heroic_name).copied(),
                 already_imported: false,
+                ignored: false,
                 game_source: Some(f.game_source),
             });
         }

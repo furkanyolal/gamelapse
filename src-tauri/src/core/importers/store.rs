@@ -87,6 +87,10 @@ pub fn import_games(
 
     for found in games {
         let game_source = found.library_source();
+        if repo::is_ignored_import(&tx, game_source, &found.source_id)? {
+            skipped += 1;
+            continue;
+        }
         let existing = tx
             .query_row(
                 "SELECT id, install_dir, cover_path FROM games WHERE source = ?1 AND source_id = ?2",

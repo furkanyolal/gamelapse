@@ -6,9 +6,11 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 
 use super::now;
+use crate::core::db::repo;
 use crate::core::importers::{self, covers, http, steam_api, store};
 use crate::core::types::{
-    DiscoveredGame, ImportResult, ImportSource, ImportSourceStatus, SteamApiSettings,
+    DiscoveredGame, GameSource, IgnoredImport, ImportResult, ImportSource, ImportSourceStatus,
+    SteamApiSettings,
 };
 use crate::error::{AppError, AppResult};
 use crate::runtime::emit_library_changed;
@@ -90,6 +92,25 @@ pub async fn scan_import_source(
 #[specta::specta]
 pub async fn import_games(app: AppHandle, source: ImportSource) -> AppResult<ImportResult> {
     blocking(move || run_import(&app, source)).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_ignored_imports(state: tauri::State<'_, AppState>) -> AppResult<Vec<IgnoredImport>> {
+    repo::list_ignored_imports(&state.db())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn restore_ignored_import(
+    app: AppHandle,
+    state: tauri::State<'_, AppState>,
+    source: GameSource,
+    source_id: String,
+) -> AppResult<()> {
+    repo::restore_ignored_import(&state.db(), source, &source_id)?;
+    emit_library_changed(&app);
+    Ok(())
 }
 
 fn load_steam_api(app: &AppHandle) -> AppResult<SteamApiSettings> {

@@ -1,0 +1,22 @@
+# Dependencies and build output
+node_modules
+dist
+src-tauri/target
+src-tauri/gen/schemas
+
+# Env
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.idea
+.vscode/*
+!.vscode/extensions.json

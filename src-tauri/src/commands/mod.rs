@@ -1,18 +1,22 @@
-//! Tauri commands exposed to the frontend.
+//! Tauri commands exposed to the frontend, grouped by family.
+//! Lock order: tracker, then db (see `AppState`).
 
-use serde::Serialize;
-use specta::Type;
+pub mod dev;
+pub mod games;
+pub mod sessions;
+pub mod settings;
+pub mod stats;
+pub mod tracker;
+
 use tauri::State;
 
+use crate::core::tracker::{Clock, SystemClock};
+use crate::core::types::AppInfo;
 use crate::error::AppResult;
 use crate::state::AppState;
 
-#[derive(Debug, Clone, Serialize, Type)]
-pub struct AppInfo {
-    pub version: String,
-    pub data_dir: String,
-    pub db_path: String,
-    pub log_dir: String,
+pub(crate) fn now() -> i64 {
+    SystemClock.now()
 }
 
 #[tauri::command]

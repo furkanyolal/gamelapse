@@ -1,6 +1,9 @@
 //! SQLite access: connection setup and schema migrations.
 
 pub mod migrations;
+pub mod repo;
+pub mod seed;
+pub mod stats;
 
 use std::path::Path;
 

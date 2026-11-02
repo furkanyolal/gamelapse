@@ -5,4 +5,6 @@ pub mod export;
 pub mod idle;
 pub mod importers;
 pub mod limits;
+pub mod settings;
 pub mod tracker;
+pub mod types;

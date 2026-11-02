@@ -1,13 +1,15 @@
 pub mod commands;
 pub mod core;
 pub mod error;
+pub mod runtime;
 pub mod state;
 
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, WindowEvent};
+use tauri_plugin_window_state::StateFlags;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -27,7 +29,31 @@ fn show_main_window(app: &AppHandle) {
 pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
         commands::get_app_info,
-        commands::ping
+        commands::ping,
+        commands::tracker::get_tracker_status,
+        commands::tracker::set_tracking_enabled,
+        commands::tracker::start_manual_session,
+        commands::tracker::stop_session,
+        commands::games::list_games,
+        commands::games::get_game,
+        commands::games::add_game_from_exe,
+        commands::games::update_game,
+        commands::games::delete_game,
+        commands::games::list_game_executables,
+        commands::games::add_game_executable,
+        commands::games::remove_game_executable,
+        commands::games::pick_executable,
+        commands::sessions::list_sessions,
+        commands::sessions::create_session,
+        commands::sessions::update_session,
+        commands::sessions::delete_session,
+        commands::stats::get_dashboard_stats,
+        commands::stats::get_daily_totals,
+        commands::stats::get_game_totals,
+        commands::stats::get_hourly_totals,
+        commands::settings::get_settings,
+        commands::settings::update_settings,
+        commands::dev::seed_demo_data,
     ])
 }
 
@@ -100,8 +126,14 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Without VISIBLE the plugin never shows the window, so `--minimized` stays hidden.
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(StateFlags::all() - StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
@@ -117,15 +149,24 @@ pub fn run() {
             let db_path = data_dir.join("gametimetracker.db");
             tracing::info!(data_dir = %data_dir.display(), db_path = %db_path.display(), "starting GameTimeTracker");
             let conn = core::db::open(&db_path)?;
+            match core::tracker::recover_crashed_sessions(&conn) {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(closed = n, "closed sessions left open by a crash"),
+                Err(e) => tracing::error!(error = %e, "crash recovery failed"),
+            }
 
+            let settings = commands::settings::load_settings(app.handle());
             app.manage(AppState {
                 db: Mutex::new(conn),
+                tracker: Mutex::new(core::tracker::Tracker::new()),
+                settings: RwLock::new(settings),
                 data_dir,
                 db_path,
                 log_dir,
             });
 
             setup_tray(app.handle())?;
+            runtime::spawn_tracker(app.handle().clone());
 
             let minimized = std::env::args().any(|a| a == "--minimized");
             if !minimized {

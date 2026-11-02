@@ -6,14 +6,279 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	getAppInfo: () => typedError<AppInfo, string>(__TAURI_INVOKE("get_app_info")),
 	ping: () => __TAURI_INVOKE<string>("ping"),
+	getTrackerStatus: () => typedError<TrackerStatus_Serialize, string>(__TAURI_INVOKE("get_tracker_status")),
+	setTrackingEnabled: (enabled: boolean) => typedError<TrackerStatus_Serialize, string>(__TAURI_INVOKE("set_tracking_enabled", { enabled })),
+	startManualSession: (gameId: number) => typedError<ActiveSession, string>(__TAURI_INVOKE("start_manual_session", { gameId })),
+	stopSession: (sessionId: number) => typedError<Session_Serialize, string>(__TAURI_INVOKE("stop_session", { sessionId })),
+	listGames: (includeHidden: boolean) => typedError<GameSummary_Serialize[], string>(__TAURI_INVOKE("list_games", { includeHidden })),
+	getGame: (gameId: number) => typedError<GameSummary_Serialize, string>(__TAURI_INVOKE("get_game", { gameId })),
+	addGameFromExe: (exePath: string, name: string | null) => typedError<Game_Serialize, string>(__TAURI_INVOKE("add_game_from_exe", { exePath, name })),
+	updateGame: (gameId: number, patch: GameUpdate_Deserialize) => typedError<Game_Serialize, string>(__TAURI_INVOKE("update_game", { gameId, patch })),
+	deleteGame: (gameId: number) => typedError<null, string>(__TAURI_INVOKE("delete_game", { gameId })),
+	listGameExecutables: (gameId: number) => typedError<GameExecutable[], string>(__TAURI_INVOKE("list_game_executables", { gameId })),
+	addGameExecutable: (gameId: number, exePath: string, matchMode: MatchMode) => typedError<GameExecutable, string>(__TAURI_INVOKE("add_game_executable", { gameId, exePath, matchMode })),
+	removeGameExecutable: (executableId: number) => typedError<null, string>(__TAURI_INVOKE("remove_game_executable", { executableId })),
+	/**  Native file picker. Async so the blocking dialog never runs on the main thread. */
+	pickExecutable: () => typedError<string | null, string>(__TAURI_INVOKE("pick_executable")),
+	listSessions: (query: SessionQuery_Deserialize) => typedError<SessionWithGame_Serialize[], string>(__TAURI_INVOKE("list_sessions", { query })),
+	createSession: (gameId: number, startedAt: number, endedAt: number, note: string | null) => typedError<Session_Serialize, string>(__TAURI_INVOKE("create_session", { gameId, startedAt, endedAt, note })),
+	updateSession: (sessionId: number, patch: SessionUpdate_Deserialize) => typedError<Session_Serialize, string>(__TAURI_INVOKE("update_session", { sessionId, patch })),
+	deleteSession: (sessionId: number) => typedError<null, string>(__TAURI_INVOKE("delete_session", { sessionId })),
+	getDashboardStats: () => typedError<DashboardStats_Serialize, string>(__TAURI_INVOKE("get_dashboard_stats")),
+	getDailyTotals: (days: number, gameId: number | null) => typedError<DailyTotal[], string>(__TAURI_INVOKE("get_daily_totals", { days, gameId })),
+	getGameTotals: (from: number | null, to: number | null, limit: number) => typedError<GameTotal[], string>(__TAURI_INVOKE("get_game_totals", { from, to, limit })),
+	getHourlyTotals: (days: number) => typedError<HourlyTotal[], string>(__TAURI_INVOKE("get_hourly_totals", { days })),
+	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
+	updateSettings: (patch: SettingsUpdate_Deserialize) => typedError<Settings, string>(__TAURI_INVOKE("update_settings", { patch })),
+	seedDemoData: () => typedError<null, string>(__TAURI_INVOKE("seed_demo_data")),
 };
 
 /* Types */
+export type ActiveSession = {
+	sessionId: number,
+	gameId: number,
+	gameName: string,
+	startedAt: number,
+	elapsedSecs: number,
+	afkSecs: number,
+	isAfk: boolean,
+	source: ActiveSource,
+};
+
+/**  The source of an [`ActiveSession`]; the contract restricts it to `auto` or `manual`. */
+export type ActiveSource = "auto" | "manual";
+
 export type AppInfo = {
 	version: string,
-	data_dir: string,
-	db_path: string,
-	log_dir: string,
+	dataDir: string,
+	dbPath: string,
+	logDir: string,
+};
+
+export type DailyTotal = {
+	date: string,
+	totalSecs: number,
+};
+
+export type DashboardStats = DashboardStats_Serialize | DashboardStats_Deserialize;
+
+export type DashboardStats_Deserialize = {
+	todaySecs: number,
+	weekSecs: number,
+	allTimeSecs: number,
+	gamesPlayedCount: number,
+	topGames: GameTotal[],
+	recentSessions: SessionWithGame_Deserialize[],
+};
+
+export type DashboardStats_Serialize = {
+	todaySecs: number,
+	weekSecs: number,
+	allTimeSecs: number,
+	gamesPlayedCount: number,
+	topGames: GameTotal[],
+	recentSessions: SessionWithGame_Serialize[],
+};
+
+export type Game = Game_Serialize | Game_Deserialize;
+
+export type GameExecutable = {
+	id: number,
+	gameId: number,
+	exePath: string,
+	matchMode: MatchMode,
+};
+
+export type GameSource = "manual" | "steam" | "epic" | "gog";
+
+export type GameSummary = GameSummary_Serialize | GameSummary_Deserialize;
+
+export type GameSummary_Deserialize = {
+	game: Game_Deserialize,
+	totalSecs: number,
+	todaySecs: number,
+	weekSecs: number,
+	sessionCount: number,
+	lastPlayedAt?: number | null,
+	importedMinutes: number,
+};
+
+export type GameSummary_Serialize = {
+	game: Game_Serialize,
+	totalSecs: number,
+	todaySecs: number,
+	weekSecs: number,
+	sessionCount: number,
+	lastPlayedAt: number | null,
+	importedMinutes: number,
+};
+
+export type GameTotal = {
+	gameId: number,
+	gameName: string,
+	totalSecs: number,
+};
+
+export type GameUpdate = GameUpdate_Serialize | GameUpdate_Deserialize;
+
+export type GameUpdate_Deserialize = {
+	name?: string | null,
+	hidden?: boolean | null,
+	afkDetectionEnabled?: boolean | null,
+};
+
+export type GameUpdate_Serialize = {
+	name: string | null,
+	hidden: boolean | null,
+	afkDetectionEnabled: boolean | null,
+};
+
+export type Game_Deserialize = {
+	id: number,
+	name: string,
+	sortName: string,
+	source: GameSource,
+	sourceId?: string | null,
+	installDir?: string | null,
+	iconPath?: string | null,
+	coverPath?: string | null,
+	hidden: boolean,
+	afkDetectionEnabled: boolean,
+	createdAt: number,
+};
+
+export type Game_Serialize = {
+	id: number,
+	name: string,
+	sortName: string,
+	source: GameSource,
+	sourceId: string | null,
+	installDir: string | null,
+	iconPath: string | null,
+	coverPath: string | null,
+	hidden: boolean,
+	afkDetectionEnabled: boolean,
+	createdAt: number,
+};
+
+export type HourlyTotal = {
+	hour: number,
+	totalSecs: number,
+};
+
+export type MatchMode = "exact_path" | "install_dir_prefix" | "exe_name";
+
+export type Session = Session_Serialize | Session_Deserialize;
+
+export type SessionQuery = SessionQuery_Serialize | SessionQuery_Deserialize;
+
+export type SessionQuery_Deserialize = {
+	gameId?: number | null,
+	from?: number | null,
+	to?: number | null,
+	limit: number,
+	offset: number,
+};
+
+export type SessionQuery_Serialize = {
+	gameId: number | null,
+	from: number | null,
+	to: number | null,
+	limit: number,
+	offset: number,
+};
+
+export type SessionSource = "auto" | "manual" | "imported";
+
+export type SessionUpdate = SessionUpdate_Serialize | SessionUpdate_Deserialize;
+
+export type SessionUpdate_Deserialize = {
+	startedAt?: number | null,
+	endedAt?: number | null,
+	note?: string | null,
+};
+
+export type SessionUpdate_Serialize = {
+	startedAt: number | null,
+	endedAt: number | null,
+	note: string | null,
+};
+
+export type SessionWithGame = SessionWithGame_Serialize | SessionWithGame_Deserialize;
+
+export type SessionWithGame_Deserialize = {
+	gameName: string,
+} & Session_Deserialize;
+
+export type SessionWithGame_Serialize = {
+	gameName: string,
+} & Session_Serialize;
+
+export type Session_Deserialize = {
+	id: number,
+	gameId: number,
+	startedAt: number,
+	endedAt?: number | null,
+	durationSecs: number,
+	afkSecs: number,
+	source: SessionSource,
+	note?: string | null,
+};
+
+export type Session_Serialize = {
+	id: number,
+	gameId: number,
+	startedAt: number,
+	endedAt: number | null,
+	durationSecs: number,
+	afkSecs: number,
+	source: SessionSource,
+	note: string | null,
+};
+
+export type Settings = {
+	pollIntervalSecs: number,
+	afkThresholdSecs: number,
+	sessionMergeGapSecs: number,
+	requireForeground: boolean,
+	trackingEnabled: boolean,
+	theme: Theme,
+};
+
+export type SettingsUpdate = SettingsUpdate_Serialize | SettingsUpdate_Deserialize;
+
+export type SettingsUpdate_Deserialize = {
+	pollIntervalSecs?: number | null,
+	afkThresholdSecs?: number | null,
+	sessionMergeGapSecs?: number | null,
+	requireForeground?: boolean | null,
+	trackingEnabled?: boolean | null,
+	theme?: Theme | null,
+};
+
+export type SettingsUpdate_Serialize = {
+	pollIntervalSecs: number | null,
+	afkThresholdSecs: number | null,
+	sessionMergeGapSecs: number | null,
+	requireForeground: boolean | null,
+	trackingEnabled: boolean | null,
+	theme: Theme | null,
+};
+
+export type Theme = "dark" | "light" | "system";
+
+export type TrackerStatus = TrackerStatus_Serialize | TrackerStatus_Deserialize;
+
+export type TrackerStatus_Deserialize = {
+	trackingEnabled: boolean,
+	active: ActiveSession[],
+	lastPollAt?: number | null,
+};
+
+export type TrackerStatus_Serialize = {
+	trackingEnabled: boolean,
+	active: ActiveSession[],
+	lastPollAt: number | null,
 };
 
 /* Tauri Specta runtime */

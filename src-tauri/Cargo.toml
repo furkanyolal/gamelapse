@@ -35,6 +35,10 @@ anyhow = "1"
 specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 specta-typescript = "0.0.13"
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading"] }
+tauri-plugin-dialog = "2.8.4"
 
 # Debug info is off in dev builds to keep `target/` small (full debug info needs several GB on Windows).
 # Switch to `debug = "line-tables-only"` once disk space allows, for line numbers in backtraces.

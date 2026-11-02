@@ -20,6 +20,13 @@ pub fn load_settings(app: &AppHandle) -> Settings {
         .store(SETTINGS_FILE)
         .ok()
         .and_then(|store| store.get(SETTINGS_KEY))
+        .map(|mut value| {
+            // Settings saved before Phase 3 lack this field; keep them instead of resetting.
+            if let Some(obj) = value.as_object_mut() {
+                obj.entry("importOnStartup").or_insert(true.into());
+            }
+            value
+        })
         .and_then(|value| serde_json::from_value::<Settings>(value).ok())
         .filter(|s| s.validate().is_ok());
     stored.unwrap_or_default()

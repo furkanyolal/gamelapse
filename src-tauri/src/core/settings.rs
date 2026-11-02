@@ -15,6 +15,7 @@ impl Default for Settings {
             require_foreground: false,
             tracking_enabled: true,
             theme: Theme::Dark,
+            import_on_startup: true,
         }
     }
 }
@@ -60,6 +61,9 @@ impl Settings {
         }
         if let Some(v) = patch.theme {
             next.theme = v;
+        }
+        if let Some(v) = patch.import_on_startup {
+            next.import_on_startup = v;
         }
         next.validate()?;
         Ok(next)

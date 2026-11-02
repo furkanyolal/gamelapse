@@ -135,6 +135,17 @@ pub fn delete_game(conn: &Connection, id: i32) -> AppResult<()> {
     Ok(())
 }
 
+/// The Steam game with this app id, if it is in the library.
+pub fn steam_game_for_app(conn: &Connection, app_id: u32) -> AppResult<Option<i32>> {
+    Ok(conn
+        .query_row(
+            "SELECT id FROM games WHERE source = 'steam' AND source_id = ?1",
+            [app_id.to_string()],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 // ---------------------------------------------------------- executables
 
 fn map_exe(row: &Row) -> rusqlite::Result<GameExecutable> {

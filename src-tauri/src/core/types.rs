@@ -231,6 +231,7 @@ pub struct Settings {
     pub require_foreground: bool,
     pub tracking_enabled: bool,
     pub theme: Theme,
+    pub import_on_startup: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Type)]
@@ -244,6 +245,7 @@ pub struct SettingsUpdate {
     pub require_foreground: Option<bool>,
     pub tracking_enabled: Option<bool>,
     pub theme: Option<Theme>,
+    pub import_on_startup: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]
@@ -274,4 +276,71 @@ pub struct SessionQuery {
     pub to: Option<i64>,
     pub limit: u32,
     pub offset: u32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportSource {
+    Steam,
+    Epic,
+    Gog,
+}
+str_enum!(ImportSource { Steam => "steam", Epic => "epic", Gog => "gog" });
+
+impl ImportSource {
+    pub const ALL: [ImportSource; 3] = [Self::Steam, Self::Epic, Self::Gog];
+
+    pub fn game_source(self) -> GameSource {
+        match self {
+            Self::Steam => GameSource::Steam,
+            Self::Epic => GameSource::Epic,
+            Self::Gog => GameSource::Gog,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportSourceStatus {
+    pub source: ImportSource,
+    /// The launcher was found on this machine.
+    pub available: bool,
+    /// Install path when available, otherwise why not.
+    pub detail: Option<String>,
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub last_scan_at: Option<i64>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveredGame {
+    pub source: ImportSource,
+    pub source_id: String,
+    pub name: String,
+    pub install_dir: Option<String>,
+    /// Normalised exact executable paths known from the launcher; may be empty.
+    pub executables: Vec<String>,
+    /// Launcher-reported playtime, when the launcher tracks it.
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub playtime_minutes: Option<i64>,
+    /// A game with this source and sourceId already exists.
+    pub already_imported: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportResult {
+    pub source: ImportSource,
+    pub discovered: i32,
+    pub added: i32,
+    pub updated: i32,
+    pub skipped: i32,
+    pub errors: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SteamApiSettings {
+    pub api_key: Option<String>,
+    pub steam_id64: Option<String>,
 }

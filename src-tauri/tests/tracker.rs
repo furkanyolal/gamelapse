@@ -322,3 +322,70 @@ fn stopping_a_running_auto_session_is_not_undone_by_the_next_poll() {
     assert_eq!(sessions.len(), 1);
     assert_eq!(sessions[0].session.ended_at, Some(1002));
 }
+
+fn steam_game(rig: &Rig, app_id: &str) -> i32 {
+    use gametimetracker_lib::core::types::GameSource;
+    repo::insert_game(
+        &rig.conn,
+        "Steam Game",
+        GameSource::Steam,
+        Some(app_id),
+        None,
+        0,
+    )
+    .unwrap()
+    .id
+}
+
+#[test]
+fn matched_games_steam_signal() {
+    use gametimetracker_lib::core::tracker::{Snapshot, matched_games};
+    let snap = Snapshot {
+        processes: vec![],
+        foreground: None,
+        steam_running_app_id: Some(10),
+    };
+    assert!(matched_games(&[], &snap, false, Some(7)).contains(&7));
+    assert!(matched_games(&[], &snap, false, None).is_empty());
+    // Steam cannot say which window is foreground, so the signal waits for a real match.
+    assert!(matched_games(&[], &snap, true, Some(7)).is_empty());
+}
+
+#[test]
+fn snapshot_detects_steam_exe_by_name() {
+    use gametimetracker_lib::core::tracker::Snapshot;
+    let with = |p: &str| Snapshot {
+        processes: vec![p.to_string()],
+        ..Snapshot::default()
+    };
+    assert!(with(r"c:\program files (x86)\steam\steam.exe").steam_running());
+    assert!(!with(r"c:\program files (x86)\steam\steamwebhelper.exe").steam_running());
+    assert!(!with(r"c:\games\mysteam.exe").steam_running());
+}
+
+#[test]
+fn steam_running_app_starts_and_ends_a_session_without_a_process_path() {
+    let mut rig = Rig::new();
+    let game = steam_game(&rig, "1245620");
+    let other = steam_game(&rig, "620");
+
+    rig.source.set(&[r"c:\windows\explorer.exe"], None);
+    rig.source.set_steam_app(Some(1245620));
+    let events = rig.tick(1000);
+    assert!(has(
+        &events,
+        |e| matches!(e, TrackerEvent::Started(a) if a.game_id == game)
+    ));
+    assert!(!has(
+        &events,
+        |e| matches!(e, TrackerEvent::Started(a) if a.game_id == other)
+    ));
+
+    rig.source.set_steam_app(None);
+    rig.tick(1005);
+    let events = rig.tick(1010);
+    assert!(has(
+        &events,
+        |e| matches!(e, TrackerEvent::Ended(s) if s.game_id == game)
+    ));
+}

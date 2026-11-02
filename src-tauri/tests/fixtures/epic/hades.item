@@ -1,0 +1,9 @@
+{
+	"FormatVersion": 0,
+	"bIsIncompleteInstall": false,
+	"DisplayName": "Hades",
+	"AppName": "Min",
+	"MainGameAppName": "Min",
+	"InstallLocation": "{INSTALL}\\Hades",
+	"LaunchExecutable": "Hades.exe"
+}

@@ -54,6 +54,12 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::settings::get_settings,
         commands::settings::update_settings,
         commands::dev::seed_demo_data,
+        commands::imports::list_import_sources,
+        commands::imports::scan_import_source,
+        commands::imports::import_games,
+        commands::imports::get_steam_api_settings,
+        commands::imports::set_steam_api_settings,
+        commands::imports::fetch_steam_playtime,
     ])
 }
 
@@ -167,6 +173,7 @@ pub fn run() {
 
             setup_tray(app.handle())?;
             runtime::spawn_tracker(app.handle().clone());
+            runtime::spawn_startup_import(app.handle().clone());
 
             let minimized = std::env::args().any(|a| a == "--minimized");
             if !minimized {

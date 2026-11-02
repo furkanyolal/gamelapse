@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-store = "2"
@@ -39,6 +39,10 @@ chrono = { version = "0.4.45", default-features = false, features = ["clock", "s
 sysinfo = { version = "0.40.1", default-features = false, features = ["system"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading"] }
 tauri-plugin-dialog = "2.8.4"
+winreg = "0.56"
+keyvalues-parser = "0.2"
+ureq = "3"
+tempfile = "3"
 
 # Debug info is off in dev builds to keep `target/` small (full debug info needs several GB on Windows).
 # Switch to `debug = "line-tables-only"` once disk space allows, for line numbers in backtraces.

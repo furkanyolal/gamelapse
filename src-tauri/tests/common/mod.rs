@@ -30,7 +30,12 @@ impl FakeSource {
         *self.0.lock().unwrap() = Snapshot {
             processes: processes.iter().map(|p| p.to_string()).collect(),
             foreground: foreground.map(str::to_string),
+            steam_running_app_id: None,
         };
+    }
+
+    pub fn set_steam_app(&self, app_id: Option<u32>) {
+        self.0.lock().unwrap().steam_running_app_id = app_id;
     }
 }
 

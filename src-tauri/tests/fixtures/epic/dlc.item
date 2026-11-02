@@ -1,0 +1,9 @@
+{
+	"FormatVersion": 0,
+	"bIsIncompleteInstall": false,
+	"DisplayName": "Hades Soundtrack DLC",
+	"AppName": "MinDlc",
+	"MainGameAppName": "Min",
+	"InstallLocation": "{INSTALL}\\Hades",
+	"LaunchExecutable": ""
+}

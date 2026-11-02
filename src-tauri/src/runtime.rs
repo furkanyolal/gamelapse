@@ -47,6 +47,46 @@ pub fn spawn_tracker(app: AppHandle) {
     }
 }
 
+/// Imports every available launcher once, on its own thread, when `importOnStartup` is on.
+/// Each import emits `library-changed` itself.
+pub fn spawn_startup_import(app: AppHandle) {
+    if !app.state::<AppState>().settings().import_on_startup {
+        return;
+    }
+    let spawned = std::thread::Builder::new()
+        .name("startup-import".into())
+        .spawn(move || {
+            let statuses = match crate::commands::imports::source_statuses(&app) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(error = %e, "startup import: cannot list launchers");
+                    return;
+                }
+            };
+            for status in statuses.into_iter().filter(|s| s.available) {
+                match crate::commands::imports::run_import(&app, status.source) {
+                    Ok(r) => tracing::info!(
+                        source = r.source.as_str(),
+                        discovered = r.discovered,
+                        added = r.added,
+                        updated = r.updated,
+                        skipped = r.skipped,
+                        errors = r.errors.len(),
+                        "startup import finished"
+                    ),
+                    Err(e) => tracing::warn!(
+                        source = status.source.as_str(),
+                        error = %e,
+                        "startup import failed"
+                    ),
+                }
+            }
+        });
+    if let Err(e) = spawned {
+        tracing::error!(error = %e, "failed to start import thread");
+    }
+}
+
 fn run_loop(app: AppHandle) {
     let mut source = match SysinfoProcessSource::new() {
         Ok(source) => source,

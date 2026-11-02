@@ -3,6 +3,7 @@
 
 pub mod dev;
 pub mod games;
+pub mod imports;
 pub mod sessions;
 pub mod settings;
 pub mod stats;

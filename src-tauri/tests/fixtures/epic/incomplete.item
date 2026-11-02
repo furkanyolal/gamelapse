@@ -1,0 +1,9 @@
+{
+	"FormatVersion": 0,
+	"bIsIncompleteInstall": true,
+	"DisplayName": "Half Installed",
+	"AppName": "Half",
+	"MainGameAppName": "Half",
+	"InstallLocation": "{INSTALL}\\Half",
+	"LaunchExecutable": "Half.exe"
+}

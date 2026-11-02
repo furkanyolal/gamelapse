@@ -9,6 +9,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindow
 
 use super::{ProcessSource, Snapshot};
 use crate::core::db::repo::normalize_path;
+use crate::core::importers::registry::{WinRegistry, steam_running_app_id};
 
 pub struct SysinfoProcessSource {
     system: System,
@@ -39,10 +40,16 @@ impl ProcessSource for SysinfoProcessSource {
             .collect();
         processes.sort_unstable();
         processes.dedup();
-        Snapshot {
+        let mut snapshot = Snapshot {
             processes,
             foreground: foreground_process_path(),
+            steam_running_app_id: None,
+        };
+        // The registry value goes stale when Steam exits, so only trust it while Steam runs.
+        if snapshot.steam_running() {
+            snapshot.steam_running_app_id = steam_running_app_id(&WinRegistry);
         }
+        snapshot
     }
 }
 

@@ -24,6 +24,18 @@ const MISSED_POLLS_TO_END: u8 = 2;
 pub struct Snapshot {
     pub processes: Vec<String>,
     pub foreground: Option<String>,
+    /// `HKCU\Software\Valve\Steam\RunningAppID`, read only while `steam.exe` runs.
+    /// `None` when Steam is not running or no app is running.
+    pub steam_running_app_id: Option<u32>,
+}
+
+impl Snapshot {
+    /// True if a process named `steam.exe` is in the snapshot.
+    pub fn steam_running(&self) -> bool {
+        self.processes
+            .iter()
+            .any(|p| p.rsplit('\\').next() == Some("steam.exe"))
+    }
 }
 
 pub trait ProcessSource: Send {
@@ -56,10 +68,15 @@ pub fn matches(exe: &GameExecutable, process_path: &str) -> bool {
 
 /// Games with at least one executable matching the snapshot. With `require_foreground`
 /// only the foreground process counts.
+///
+/// `steam_game` is the Steam game whose app id equals `snapshot.steam_running_app_id`; it
+/// counts as matched even when no process path is readable. Steam does not say which window
+/// belongs to the app, so the signal is ignored under `require_foreground`.
 pub fn matched_games(
     executables: &[GameExecutable],
     snapshot: &Snapshot,
     require_foreground: bool,
+    steam_game: Option<i32>,
 ) -> HashSet<i32> {
     let foreground: Vec<&String> = snapshot.foreground.iter().collect();
     let candidates: Vec<&String> = if require_foreground {
@@ -67,11 +84,15 @@ pub fn matched_games(
     } else {
         snapshot.processes.iter().chain(foreground).collect()
     };
-    executables
+    let mut matched: HashSet<i32> = executables
         .iter()
         .filter(|exe| candidates.iter().any(|p| matches(exe, p)))
         .map(|exe| exe.game_id)
-        .collect()
+        .collect();
+    if !require_foreground && let Some(id) = steam_game {
+        matched.insert(id);
+    }
+    matched
 }
 
 /// Closes every session left open by a crash at its last heartbeat (or `startedAt`).
@@ -265,7 +286,11 @@ impl Tracker {
         let matched = match snapshot {
             Some(snap) if settings.tracking_enabled => {
                 let executables = repo::list_all_executables(conn)?;
-                matched_games(&executables, snap, settings.require_foreground)
+                let steam_game = match snap.steam_running_app_id {
+                    Some(app_id) => repo::steam_game_for_app(conn, app_id)?,
+                    None => None,
+                };
+                matched_games(&executables, snap, settings.require_foreground, steam_game)
             }
             _ => HashSet::new(),
         };

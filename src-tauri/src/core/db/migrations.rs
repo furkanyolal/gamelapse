@@ -68,8 +68,15 @@ CREATE TABLE limits (
 );
 ";
 
+const V2: &str = "
+CREATE TABLE import_sources (
+  source TEXT PRIMARY KEY,                 -- steam|epic|gog
+  last_scan_at INTEGER NOT NULL
+);
+";
+
 /// The ordered list of migrations. Append only; never edit a released migration.
-const SCRIPTS: &[&str] = &[V1];
+const SCRIPTS: &[&str] = &[V1, V2];
 
 pub fn migrations() -> Migrations<'static> {
     Migrations::new(SCRIPTS.iter().map(|sql| M::up(sql)).collect())

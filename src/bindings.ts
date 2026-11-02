@@ -31,6 +31,12 @@ export const commands = {
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
 	updateSettings: (patch: SettingsUpdate_Deserialize) => typedError<Settings, string>(__TAURI_INVOKE("update_settings", { patch })),
 	seedDemoData: () => typedError<null, string>(__TAURI_INVOKE("seed_demo_data")),
+	listImportSources: () => typedError<ImportSourceStatus_Serialize[], string>(__TAURI_INVOKE("list_import_sources")),
+	scanImportSource: (source: ImportSource) => typedError<DiscoveredGame_Serialize[], string>(__TAURI_INVOKE("scan_import_source", { source })),
+	importGames: (source: ImportSource) => typedError<ImportResult, string>(__TAURI_INVOKE("import_games", { source })),
+	getSteamApiSettings: () => typedError<SteamApiSettings_Serialize, string>(__TAURI_INVOKE("get_steam_api_settings")),
+	setSteamApiSettings: (settings: SteamApiSettings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("set_steam_api_settings", { settings })),
+	fetchSteamPlaytime: () => typedError<ImportResult, string>(__TAURI_INVOKE("fetch_steam_playtime")),
 };
 
 /* Types */
@@ -78,6 +84,34 @@ export type DashboardStats_Serialize = {
 	gamesPlayedCount: number,
 	topGames: GameTotal[],
 	recentSessions: SessionWithGame_Serialize[],
+};
+
+export type DiscoveredGame = DiscoveredGame_Serialize | DiscoveredGame_Deserialize;
+
+export type DiscoveredGame_Deserialize = {
+	source: ImportSource,
+	sourceId: string,
+	name: string,
+	installDir?: string | null,
+	/**  Normalised exact executable paths known from the launcher; may be empty. */
+	executables: string[],
+	/**  Launcher-reported playtime, when the launcher tracks it. */
+	playtimeMinutes?: number | null,
+	/**  A game with this source and sourceId already exists. */
+	alreadyImported: boolean,
+};
+
+export type DiscoveredGame_Serialize = {
+	source: ImportSource,
+	sourceId: string,
+	name: string,
+	installDir: string | null,
+	/**  Normalised exact executable paths known from the launcher; may be empty. */
+	executables: string[],
+	/**  Launcher-reported playtime, when the launcher tracks it. */
+	playtimeMinutes: number | null,
+	/**  A game with this source and sourceId already exists. */
+	alreadyImported: boolean,
 };
 
 export type Game = Game_Serialize | Game_Deserialize;
@@ -166,6 +200,37 @@ export type HourlyTotal = {
 	totalSecs: number,
 };
 
+export type ImportResult = {
+	source: ImportSource,
+	discovered: number,
+	added: number,
+	updated: number,
+	skipped: number,
+	errors: string[],
+};
+
+export type ImportSource = "steam" | "epic" | "gog";
+
+export type ImportSourceStatus = ImportSourceStatus_Serialize | ImportSourceStatus_Deserialize;
+
+export type ImportSourceStatus_Deserialize = {
+	source: ImportSource,
+	/**  The launcher was found on this machine. */
+	available: boolean,
+	/**  Install path when available, otherwise why not. */
+	detail?: string | null,
+	lastScanAt?: number | null,
+};
+
+export type ImportSourceStatus_Serialize = {
+	source: ImportSource,
+	/**  The launcher was found on this machine. */
+	available: boolean,
+	/**  Install path when available, otherwise why not. */
+	detail: string | null,
+	lastScanAt: number | null,
+};
+
 export type MatchMode = "exact_path" | "install_dir_prefix" | "exe_name";
 
 export type Session = Session_Serialize | Session_Deserialize;
@@ -243,6 +308,7 @@ export type Settings = {
 	requireForeground: boolean,
 	trackingEnabled: boolean,
 	theme: Theme,
+	importOnStartup: boolean,
 };
 
 export type SettingsUpdate = SettingsUpdate_Serialize | SettingsUpdate_Deserialize;
@@ -254,6 +320,7 @@ export type SettingsUpdate_Deserialize = {
 	requireForeground?: boolean | null,
 	trackingEnabled?: boolean | null,
 	theme?: Theme | null,
+	importOnStartup?: boolean | null,
 };
 
 export type SettingsUpdate_Serialize = {
@@ -263,6 +330,19 @@ export type SettingsUpdate_Serialize = {
 	requireForeground: boolean | null,
 	trackingEnabled: boolean | null,
 	theme: Theme | null,
+	importOnStartup: boolean | null,
+};
+
+export type SteamApiSettings = SteamApiSettings_Serialize | SteamApiSettings_Deserialize;
+
+export type SteamApiSettings_Deserialize = {
+	apiKey?: string | null,
+	steamId64?: string | null,
+};
+
+export type SteamApiSettings_Serialize = {
+	apiKey: string | null,
+	steamId64: string | null,
 };
 
 export type Theme = "dark" | "light" | "system";

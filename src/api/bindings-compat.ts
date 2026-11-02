@@ -47,6 +47,7 @@ export type OutputChecks = [
   Assert<Mutual<B.ExeCandidate, T.ExeCandidate>>,
   Assert<Mutual<B.ScanCandidate_Serialize, T.ScanCandidate>>,
   Assert<Mutual<B.MetadataMatch, T.MetadataMatch>>,
+  Assert<Mutual<B.IgnoredImport, T.IgnoredImport>>,
 ];
 
 export type InputChecks = [

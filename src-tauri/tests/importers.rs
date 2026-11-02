@@ -291,6 +291,19 @@ fn epic_skips_dlc_and_incomplete_installs() {
 }
 
 #[test]
+fn epic_skips_missing_install_dirs() {
+    let games_root = tempfile::tempdir().unwrap();
+    let data = epic_dir(games_root.path());
+    // Same manifests, but the game folder was deleted.
+    fs::remove_dir_all(games_root.path().join("Hades")).unwrap();
+    let importer = EpicImporter::with_manifest_dir(
+        Box::new(FakeRegistry::default()),
+        data.path().join("Manifests"),
+    );
+    assert!(importer.scan().unwrap().games.is_empty());
+}
+
+#[test]
 fn epic_falls_back_to_registry_app_data_path() {
     let games_root = tempfile::tempdir().unwrap();
     let data = epic_dir(games_root.path());
@@ -331,8 +344,13 @@ const GOG_KEY: &str = r"SOFTWARE\WOW6432Node\GOG.com\Games";
 fn gog_registry(install: &Path) -> FakeRegistry {
     let witcher = format!(r"{GOG_KEY}\1207658930");
     let nameless = format!(r"{GOG_KEY}\555");
+    let gone = format!(r"{GOG_KEY}\888");
     FakeRegistry::default()
-        .subkeys(Hive::LocalMachine, GOG_KEY, &["1207658930", "555", "777"])
+        .subkeys(
+            Hive::LocalMachine,
+            GOG_KEY,
+            &["1207658930", "555", "777", "888"],
+        )
         .string(Hive::LocalMachine, &witcher, "gameName", "The Witcher 3")
         .string(
             Hive::LocalMachine,
@@ -346,7 +364,14 @@ fn gog_registry(install: &Path) -> FakeRegistry {
             "exe",
             &install.join(r"bin\Witcher3.exe").display().to_string(),
         )
-        .string(Hive::LocalMachine, &nameless, "path", r"C:\Nowhere")
+        .string(
+            Hive::LocalMachine,
+            &nameless,
+            "path",
+            &install.display().to_string(),
+        )
+        .string(Hive::LocalMachine, &gone, "gameName", "Uninstalled")
+        .string(Hive::LocalMachine, &gone, "path", r"C:\Nowhere\Gone")
 }
 
 fn galaxy_db(path: &Path) {
@@ -375,7 +400,8 @@ fn gog_reads_registry_without_galaxy() {
     assert!(importer.status().available);
     let scan = importer.scan().unwrap();
     assert!(scan.errors.is_empty());
-    // "555" has no name and no Galaxy title, "777" has no values at all: both dropped.
+    // "555" has no name and no Galaxy title, "777" has no values at all, "888" has no
+    // install directory on disk: all dropped.
     assert_eq!(scan.games.len(), 1);
     let g = &scan.games[0];
     assert_eq!(g.source_id, "1207658930");
@@ -546,6 +572,14 @@ fn reimport_keeps_user_edits_and_executables() {
     )
     .unwrap();
     repo::insert_executable(&conn, id, r"D:\Mods\cs-mod.exe", MatchMode::ExactPath).unwrap();
+    repo::insert_executable(
+        &conn,
+        id,
+        r"C:\Steam\common\CS\cs.exe",
+        MatchMode::ExactPath,
+    )
+    .unwrap();
+    repo::insert_executable(&conn, id, r"cs-user.exe", MatchMode::ExeName).unwrap();
 
     // Unchanged data: nothing to do.
     let same = import(&conn, std::slice::from_ref(&first), &HashMap::new(), 200);
@@ -577,14 +611,19 @@ fn reimport_keeps_user_edits_and_executables() {
         "user rule survived"
     );
     assert!(
-        exes.contains(&r"c:\steam\common\cs".to_string()),
-        "old rule is never removed"
+        exes.contains(&r"c:\steam\common\cs\cs.exe".to_string()),
+        "exact rules stay"
+    );
+    assert!(exes.contains(&"cs-user.exe".to_string()));
+    assert!(
+        !exes.contains(&r"c:\steam\common\cs".to_string()),
+        "old install dir rule is removed"
     );
     assert!(
         exes.contains(&r"d:\steam\common\cs".to_string()),
         "new install dir rule added"
     );
-    assert_eq!(exes.len(), 3);
+    assert_eq!(exes.len(), 4);
 
     let (minutes, fetched): (i64, i64) = conn
         .query_row(

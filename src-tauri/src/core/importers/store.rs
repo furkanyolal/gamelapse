@@ -100,6 +100,17 @@ pub fn import_games(
                 if let Some(dir) = &found.install_dir
                     && install_dir.as_ref() != Some(dir)
                 {
+                    // Drop the rule made for the old directory; user and exact rules stay.
+                    if let Some(old) = &install_dir {
+                        let old = normalize_path(old);
+                        if old != normalize_path(dir) {
+                            tx.execute(
+                                "DELETE FROM game_executables
+                                 WHERE game_id = ?1 AND exe_path = ?2 AND match_mode = 'install_dir_prefix'",
+                                params![id, old],
+                            )?;
+                        }
+                    }
                     tx.execute(
                         "UPDATE games SET install_dir = ?1 WHERE id = ?2",
                         params![dir, id],

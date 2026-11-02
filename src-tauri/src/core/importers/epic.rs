@@ -121,6 +121,9 @@ impl Importer for EpicImporter {
                 continue;
             }
             let install = Path::new(&m.install_location);
+            if !install.is_dir() {
+                continue;
+            }
             let executables = if m.launch_executable.is_empty() {
                 Vec::new()
             } else {
@@ -132,7 +135,7 @@ impl Importer for EpicImporter {
                 source: ImportSource::Epic,
                 source_id: m.app_name,
                 name: m.display_name,
-                install_dir: install.is_dir().then(|| m.install_location.clone()),
+                install_dir: Some(m.install_location.clone()),
                 executables,
                 playtime_minutes: None,
                 already_imported: false,

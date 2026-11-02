@@ -52,7 +52,10 @@ impl GogImporter {
             };
             // A missing name is filled from Galaxy's titles later; nameless games are dropped.
             let name = get("gameName").unwrap_or_default();
-            let path = get("path");
+            let Some(path) = get("path").filter(|p| Path::new(p).is_dir()) else {
+                continue;
+            };
+            let path = Some(path);
             let executables = match (&path, get("exe")) {
                 (Some(dir), Some(exe)) => {
                     let exe_path = Path::new(&exe);
@@ -69,7 +72,7 @@ impl GogImporter {
                 source: ImportSource::Gog,
                 source_id: id,
                 name,
-                install_dir: path.filter(|p| Path::new(p).is_dir()),
+                install_dir: path,
                 executables,
                 playtime_minutes: None,
                 already_imported: false,

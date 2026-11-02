@@ -504,3 +504,49 @@ Tag, merge and cover commands emit `library-changed`.
 - Game detail: a tag editor (toggle existing tags, create a new one inline), a cover section with "Choose image" and "Clear" using `pick_image` and `set_game_cover`, and a "Merge games" dialog that picks other games to merge into this one, with a confirmation listing what moves.
 - Settings page: a "Data" card with export (format, period preset, optional game, Export button, toast with the path), "Back up now", and "Restore from backup" behind a destructive confirmation that explains the current data is replaced and kept as a `.bak` file. After a restore, invalidate every query.
 - Query keys: `["tags", "list"]`. Tag mutations invalidate `["tags"]` and `["games"]`; merge and cover mutations invalidate `["games"]`, `["sessions"]`, `["stats"]`, `["limits"]`.
+
+## Phase 6: autostart and updates
+
+Additions to the contract above, same conventions.
+
+### Types
+
+```ts
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  /** Release date as an ISO string, when the feed provides it */
+  date: string | null;
+  notes: string | null;
+}
+
+export interface UpdateProgress {
+  downloaded: number;
+  total: number | null;
+}
+```
+
+`Settings` and `SettingsUpdate` gain `startupHintDismissed: boolean` (default `false`).
+
+### Commands
+
+| Command            | Arguments          | Returns              | Notes                                                                                                  |
+| ------------------ | ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------ |
+| `get_autostart`    |                    | `boolean`            | Whether the Windows autostart entry exists.                                                            |
+| `set_autostart`    | `enabled: boolean` | `boolean`            | Creates or removes the entry; the entry launches with `--minimized`.                                   |
+| `check_for_update` |                    | `UpdateInfo \| null` | Queries the GitHub Releases feed; `null` when up to date. Errors on network failure.                   |
+| `install_update`   |                    | `null`               | Downloads, verifies the signature, installs and relaunches. Emits `update-progress` while downloading. |
+
+### Events
+
+| Event              | Payload          | Emitted when                                                                                             |
+| ------------------ | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `update-available` | `UpdateInfo`     | The silent check that runs about 10 seconds after launch finds a newer version. At most once per launch. |
+| `update-progress`  | `UpdateProgress` | During the download started by `install_update`.                                                         |
+
+### Frontend
+
+- Settings page: a "General" card with a "Start with Windows" switch backed by `get_autostart` and `set_autostart`. An "Updates" card with the current version, the last check result, a "Check for updates" button, and, when an update exists, its version and notes with an "Install and restart" button and a progress bar fed by `update-progress`.
+- Dashboard: a dismissible banner when `startupHintDismissed` is false and autostart is off, offering "Enable" (calls `set_autostart(true)`) and "Not now"; both set `startupHintDismissed` to true.
+- Toast on `update-available` linking to Settings.
+- Query keys: `["autostart"]`, `["update", "check"]`. `set_autostart` invalidates `["autostart"]`; `check_for_update` results are cached until the next explicit check.

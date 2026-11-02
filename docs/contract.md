@@ -430,3 +430,77 @@ export interface Reminder {
 - Dashboard: a compact "Limits today" list when any limit exists, bar per limit, red when reached. The now-playing strip shows an AFK badge and the elapsed timer pauses while AFK.
 - Toasts for `limit-reached` and `reminder` in the app, in addition to the OS notification.
 - Query keys: `["limits", "list"]`. `limit-reached`, `session-started` and `session-ended` invalidate `["limits"]`; mutations invalidate `["limits"]`.
+
+## Phase 5: library management, export and backup
+
+Additions to the contract above, same conventions. The `tags` and `game_tags` tables from migration 1 are used; no new migration is needed.
+
+### Types
+
+```ts
+export interface Tag {
+  id: number;
+  name: string;
+}
+
+export interface MergeResult {
+  survivorId: number;
+  mergedSessions: number;
+  mergedExecutables: number;
+}
+
+export type ExportFormat = "csv" | "json";
+
+export interface ExportOptions {
+  format: ExportFormat;
+  /** inclusive lower bound on startedAt */
+  from: number | null;
+  /** exclusive upper bound on startedAt */
+  to: number | null;
+  gameId: number | null;
+}
+
+export interface ExportResult {
+  path: string;
+  sessions: number;
+  games: number;
+}
+
+export interface BackupInfo {
+  path: string;
+  createdAt: number;
+  sizeBytes: number;
+}
+```
+
+`GameSummary` gains `tags: Tag[]` (sorted by name).
+
+### Commands
+
+| Command            | Arguments                                    | Returns                | Notes                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | -------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list_tags`        |                                              | `Tag[]`                | Sorted by name.                                                                                                                                                                                                                                                                                                          |
+| `create_tag`       | `name: string`                               | `Tag`                  | Trimmed, 1 to 40 chars, unique case-insensitively.                                                                                                                                                                                                                                                                       |
+| `rename_tag`       | `tagId: number, name: string`                | `Tag`                  | Same rules.                                                                                                                                                                                                                                                                                                              |
+| `delete_tag`       | `tagId: number`                              | `null`                 | Cascades to `game_tags`.                                                                                                                                                                                                                                                                                                 |
+| `set_game_tags`    | `gameId: number, tagIds: number[]`           | `Tag[]`                | Replaces the game's tags.                                                                                                                                                                                                                                                                                                |
+| `merge_games`      | `survivorId: number, mergedIds: number[]`    | `MergeResult`          | Moves sessions, executables (skipping duplicates), tags and `imported_playtime` (keeping the larger value per source) onto the survivor, then deletes the merged games. Error if any of them has an active session or if `survivorId` is in `mergedIds`.                                                                 |
+| `pick_image`       |                                              | `string \| null`       | Native file dialog for png, jpg, jpeg, webp; `null` when cancelled.                                                                                                                                                                                                                                                      |
+| `set_game_cover`   | `gameId: number, sourcePath: string \| null` | `Game`                 | Copies the file to `<app data>/covers/custom/<gameId>.<ext>` and sets `coverPath`; `null` clears `coverPath` and deletes the custom file.                                                                                                                                                                                |
+| `export_data`      | `options: ExportOptions`                     | `ExportResult \| null` | Opens a save dialog (default name `gametimetracker-sessions-<YYYYMMDD>.<ext>`); `null` when cancelled.                                                                                                                                                                                                                   |
+| `backup_database`  |                                              | `BackupInfo \| null`   | Save dialog, default name `gametimetracker-backup-<YYYYMMDD-HHMM>.db`; writes a consistent copy with `VACUUM INTO`; `null` when cancelled.                                                                                                                                                                               |
+| `restore_database` |                                              | `null`                 | Open dialog filtered to `*.db`. Error if any session is active. Validates the file is SQLite with a `games` table, pauses the tracker, swaps the database file (keeping the previous one as `gametimetracker.db.bak`), reopens, runs migrations and crash recovery, then emits `library-changed` and `sessions-changed`. |
+
+Tag, merge and cover commands emit `library-changed`.
+
+### Export formats
+
+- CSV columns: `session_id, game, started_at, ended_at, duration_secs, afk_secs, source, note`, timestamps as local ISO 8601, UTF-8 with header, RFC 4180 quoting.
+- JSON: `{ exportedAt, games: Game[], sessions: SessionWithGame[] }` with the same filters applied; `games` holds only games that appear in the sessions.
+
+### Frontend
+
+- Games page: tag chips above the list that filter it (multi-select, OR), tag badges on rows.
+- Game detail: a tag editor (toggle existing tags, create a new one inline), a cover section with "Choose image" and "Clear" using `pick_image` and `set_game_cover`, and a "Merge games" dialog that picks other games to merge into this one, with a confirmation listing what moves.
+- Settings page: a "Data" card with export (format, period preset, optional game, Export button, toast with the path), "Back up now", and "Restore from backup" behind a destructive confirmation that explains the current data is replaced and kept as a `.bak` file. After a restore, invalidate every query.
+- Query keys: `["tags", "list"]`. Tag mutations invalidate `["tags"]` and `["games"]`; merge and cover mutations invalidate `["games"]`, `["sessions"]`, `["stats"]`, `["limits"]`.

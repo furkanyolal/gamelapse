@@ -24,6 +24,11 @@ describe("formatDuration", () => {
     expect(formatDuration(8100)).toBe("2h 15m");
     expect(formatDuration(3600)).toBe("1h");
   });
+  it("does not wrap at 24 hours", () => {
+    expect(formatDuration(86_400)).toBe("24h");
+    expect(formatDuration(90_000)).toBe("25h");
+    expect(formatDuration(100 * 3600 + 5 * 60)).toBe("100h 5m");
+  });
   it("formats minutes, seconds and zero", () => {
     expect(formatDuration(2700)).toBe("45m");
     expect(formatDuration(30)).toBe("30s");

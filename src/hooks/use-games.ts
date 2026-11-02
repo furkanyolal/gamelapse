@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
 import type { GameUpdate, MatchMode } from "@/api";
 import { invalidateFamilies, keys } from "@/hooks/query-keys";
+import { bumpCoverVersion } from "@/lib/assets";
 
 export function useGames(includeHidden: boolean) {
   return useQuery({
@@ -55,12 +56,19 @@ export function useMergeGames(survivorId: number) {
 export function useChooseCover(gameId: number) {
   return useManagementMutation(async () => {
     const path = await api.pickImage();
-    return path === null ? null : api.setGameCover(gameId, path);
+    if (path === null) return null;
+    const game = await api.setGameCover(gameId, path);
+    bumpCoverVersion();
+    return game;
   });
 }
 
 export function useClearCover(gameId: number) {
-  return useManagementMutation(() => api.setGameCover(gameId, null));
+  return useManagementMutation(async () => {
+    const game = await api.setGameCover(gameId, null);
+    bumpCoverVersion();
+    return game;
+  });
 }
 
 /** Picks an executable with the native dialog, then creates the game. */

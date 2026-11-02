@@ -1,5 +1,6 @@
 import { Gamepad2 } from "lucide-react";
-import { coverSrc } from "@/lib/assets";
+import { useSyncExternalStore } from "react";
+import { coverSrc, getCoverVersion, subscribeCoverVersion } from "@/lib/assets";
 import { cn } from "@/lib/utils";
 
 /** Cover art with a neutral placeholder when the game has none. */
@@ -10,6 +11,8 @@ export function GameCover({
   coverPath: string | null;
   className?: string;
 }) {
+  // Re-render when a cover is replaced in place (same path, new bytes).
+  useSyncExternalStore(subscribeCoverVersion, getCoverVersion);
   const src = coverSrc(coverPath);
   return (
     <div

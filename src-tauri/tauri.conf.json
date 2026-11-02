@@ -25,7 +25,7 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/com.furkanyolal.gamelapse/covers/**"]
+        "scope": ["$APPDATA/covers/**"]
       }
     }
   },

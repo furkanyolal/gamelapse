@@ -12,6 +12,7 @@ const base: ActiveSession = {
   afkSecs: 0,
   isAfk: false,
   source: "auto",
+  hidden: false,
 };
 
 describe("liveElapsed", () => {

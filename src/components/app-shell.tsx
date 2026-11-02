@@ -37,7 +37,7 @@ const NAV_ITEMS = [
 export function AppShell() {
   useApiEvents();
   const { data: status } = useTrackerStatus();
-  const playing = status?.active[0];
+  const playing = status?.active.find((a) => !a.hidden);
   const { pathname } = useLocation();
   const isActive = (to: string) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to);

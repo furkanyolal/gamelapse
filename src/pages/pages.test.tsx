@@ -1,19 +1,21 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/api";
 import Dashboard from "@/pages/dashboard";
+import GameDetail from "@/pages/game-detail";
 import Games from "@/pages/games";
+import Sessions from "@/pages/sessions";
 import Settings from "@/pages/settings";
 
-function renderPage(page: React.ReactNode) {
+function renderPage(page: React.ReactNode, path = "/") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>{page}</MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>{page}</MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -60,6 +62,56 @@ describe("Dashboard", () => {
     vi.spyOn(api, "getDashboardStats").mockRejectedValue(new Error("boom"));
     renderPage(<Dashboard />);
     expect(await screen.findByRole("alert")).toHaveTextContent("boom");
+  });
+});
+
+describe("Hidden games", () => {
+  it("renders no now playing strip when only a hidden game is active", async () => {
+    const status = await api.getTrackerStatus();
+    const hiddenOnly = status.active.filter((a) => a.hidden);
+    expect(hiddenOnly.length).toBeGreaterThan(0);
+    vi.spyOn(api, "getTrackerStatus").mockResolvedValue({
+      ...status,
+      active: hiddenOnly,
+    });
+    renderPage(<Dashboard />);
+    expect(await screen.findByText("All time")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("Now playing")).not.toBeInTheDocument();
+  });
+
+  it("toggles includeHidden from the Sessions switch", async () => {
+    const spy = vi.spyOn(api, "listSessions");
+    renderPage(<Sessions />);
+    const toggle = await screen.findByLabelText("Show hidden games");
+    expect(toggle).not.toBeChecked();
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ includeHidden: false }),
+      ),
+    );
+    const { default: userEvent } = await import("@testing-library/user-event");
+    await userEvent.click(toggle);
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ includeHidden: true }),
+      ),
+    );
+  });
+
+  it("badges a hidden game on its detail page", async () => {
+    const hidden = (await api.listGames(true)).find((g) => g.game.hidden)!;
+    renderPage(
+      <Routes>
+        <Route path="/games/:id" element={<GameDetail />} />
+      </Routes>,
+      `/games/${hidden.game.id}`,
+    );
+    expect(
+      await screen.findByText(
+        "Hidden: tracked, but left out of lists and totals",
+      ),
+    ).toBeInTheDocument();
   });
 });
 

@@ -145,6 +145,7 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
     to: null,
     limit: 20,
     offset: 0,
+    includeHidden: true,
   });
 
   const [renameOpen, setRenameOpen] = useState(false);
@@ -166,7 +167,11 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
         <div className="flex flex-wrap items-center gap-3">
           <GameCover coverPath={game.coverPath} className="h-16 w-32" />
           <h1 className="text-2xl font-semibold tracking-tight">{game.name}</h1>
-          {game.hidden && <Badge variant="outline">Hidden</Badge>}
+          {game.hidden && (
+            <Badge variant="outline">
+              Hidden: tracked, but left out of lists and totals
+            </Badge>
+          )}
           {playing && <Badge>Playing</Badge>}
           <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={() => setRenameOpen(true)}>

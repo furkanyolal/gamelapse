@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, RowsSkeleton } from "@/components/query-state";
 import { SessionDialog } from "@/components/session-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -41,6 +43,7 @@ export default function Sessions() {
   const [gameFilter, setGameFilter] = useState("all");
   const [preset, setPreset] = useState<string>("30");
   const [offset, setOffset] = useState(0);
+  const [showHidden, setShowHidden] = useState(false);
   const [editing, setEditing] = useState<SessionWithGame | null>(null);
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<SessionWithGame | null>(null);
@@ -53,10 +56,14 @@ export default function Sessions() {
     to: null,
     limit: PAGE_SIZE,
     offset,
+    includeHidden: showHidden,
   });
   const del = useDeleteSession();
 
   const rows = sessions.data ?? [];
+  const hiddenIds = new Set(
+    games.data?.filter((g) => g.game.hidden).map((g) => g.game.id),
+  );
 
   return (
     <div className="space-y-6">
@@ -108,6 +115,17 @@ export default function Sessions() {
             ))}
           </TabsList>
         </Tabs>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="show-hidden-games"
+            checked={showHidden}
+            onCheckedChange={(v) => {
+              setShowHidden(v);
+              setOffset(0);
+            }}
+          />
+          <Label htmlFor="show-hidden-games">Show hidden games</Label>
+        </div>
       </div>
 
       {sessions.isPending && <RowsSkeleton rows={8} />}
@@ -135,7 +153,14 @@ export default function Sessions() {
               <TableBody>
                 {rows.map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.gameName}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.gameName}
+                      {hiddenIds.has(s.gameId) && (
+                        <Badge variant="outline" className="ml-2">
+                          Hidden
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell>{formatDateTime(s.startedAt)}</TableCell>
                     <TableCell>
                       {s.endedAt === null ? (

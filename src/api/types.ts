@@ -58,6 +58,7 @@ export interface ActiveSession {
   afkSecs: number;
   isAfk: boolean;
   source: "auto" | "manual";
+  hidden: boolean;
 }
 
 export interface TrackerStatus {
@@ -313,6 +314,7 @@ export interface SessionQuery {
   to: number | null;
   limit: number;
   offset: number;
+  includeHidden: boolean;
 }
 
 export type ApiEventMap = {

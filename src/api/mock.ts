@@ -50,6 +50,8 @@ const DEMO_GAMES = [
   { name: "Factorio", weight: 3 },
   { name: "The Witcher 3", weight: 2 },
 ];
+/** Hidden by default, like non-game apps the Steam importer marks. */
+const HIDDEN_DEMO_GAMES = ["Wallpaper Engine", "Lossless Scaling"];
 const DEFAULT_SETTINGS: Settings = {
   pollIntervalSecs: 5,
   afkThresholdSecs: 600,
@@ -310,6 +312,15 @@ export function createMockApi(options: MockOptions = {}): Api {
     return games.find((g) => g.id === gameId)?.name ?? "Unknown";
   }
 
+  function isHidden(gameId: number): boolean {
+    return games.find((g) => g.id === gameId)?.hidden ?? false;
+  }
+
+  /** Sessions of games that are not hidden. */
+  function visibleSessions(): Session[] {
+    return sessions.filter((s) => !isHidden(s.gameId));
+  }
+
   function toActive(s: Session): ActiveSession {
     return {
       sessionId: s.id,
@@ -320,6 +331,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       afkSecs: s.afkSecs,
       isAfk: afkSessions.has(s.id),
       source: s.source === "manual" ? "manual" : "auto",
+      hidden: isHidden(s.gameId),
     };
   }
 
@@ -333,7 +345,7 @@ export function createMockApi(options: MockOptions = {}): Api {
   function statusOfLimit(l: StoredLimit): LimitStatus {
     const own =
       l.gameId === null
-        ? sessions
+        ? visibleSessions()
         : sessions.filter((s) => s.gameId === l.gameId);
     const used = sumWithin(own, localMidnight(now()), Infinity);
     return {
@@ -751,6 +763,38 @@ export function createMockApi(options: MockOptions = {}): Api {
       }
     }
     generated.forEach((s) => insertSession(s));
+    // Background tools that run all day: tracked, but hidden from every list.
+    const tools = HIDDEN_DEMO_GAMES.map((name, i) => {
+      const dir = `c:\\tools\\${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+      const game = insertGame(name, {
+        sourceId: `demo-tool-${i + 1}`,
+        installDir: dir,
+        hidden: true,
+        createdAt: now() - 60 * DAY,
+      });
+      executables.push({
+        id: nextExeId++,
+        gameId: game.id,
+        exePath: `${dir}\\tool.exe`,
+        matchMode: "exact_path",
+      });
+      return game;
+    });
+    for (let daysAgo = 14; daysAgo >= 1; daysAgo--) {
+      const dayStart = localMidnight(now(), -daysAgo);
+      tools.forEach((tool, i) => {
+        const length = (i === 0 ? 8 : 3) * 3600;
+        insertSession({
+          gameId: tool.id,
+          startedAt: dayStart + 8 * 3600,
+          endedAt: dayStart + 8 * 3600 + length,
+          durationSecs: length,
+          afkSecs: 0,
+          source: "auto",
+          note: null,
+        });
+      });
+    }
     if (withActive) {
       const active = insertSession({
         gameId: demo[6].id,
@@ -762,6 +806,15 @@ export function createMockApi(options: MockOptions = {}): Api {
         note: null,
       });
       fakeAfkSessionId = active.id;
+      insertSession({
+        gameId: tools[0].id,
+        startedAt: now() - 3 * 3600,
+        endedAt: null,
+        durationSecs: 0,
+        afkSecs: 0,
+        source: "auto",
+        note: null,
+      });
       limits.push(
         {
           id: nextLimitId++,
@@ -821,7 +874,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       return;
     }
     for (const s of activeSessions()) {
-      if (afkSessions.has(s.id)) continue;
+      if (afkSessions.has(s.id) || isHidden(s.gameId)) continue;
       const elapsed = durationOf(s);
       const bucket = Math.floor(elapsed / interval);
       const prev = reminderBuckets.get(s.id);
@@ -1021,6 +1074,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       return sessions
         .filter(
           (s) =>
+            (query.includeHidden || !isHidden(s.gameId)) &&
             (query.gameId === null || s.gameId === query.gameId) &&
             (query.from === null || s.startedAt >= query.from) &&
             (query.to === null || s.startedAt < query.to),
@@ -1067,16 +1121,19 @@ export function createMockApi(options: MockOptions = {}): Api {
     },
     async getDashboardStats() {
       const topMap = new Map<number, number>();
-      sessions.forEach((s) => topMap.set(s.gameId, 0));
+      const shown = visibleSessions();
+      shown.forEach((s) => topMap.set(s.gameId, 0));
       importedMinutes.forEach((m, gameId) => {
-        if (m > 0 && games.some((g) => g.id === gameId)) topMap.set(gameId, 0);
+        if (m > 0 && games.some((g) => g.id === gameId && !g.hidden)) {
+          topMap.set(gameId, 0);
+        }
       });
       topMap.forEach((_, gameId) => topMap.set(gameId, allTimeSecsOf(gameId)));
       let allTime = 0;
       topMap.forEach((secs) => (allTime += secs));
       return {
-        todaySecs: sumWithin(sessions, localMidnight(now()), Infinity),
-        weekSecs: sumWithin(sessions, localMidnight(now(), -6), Infinity),
+        todaySecs: sumWithin(shown, localMidnight(now()), Infinity),
+        weekSecs: sumWithin(shown, localMidnight(now(), -6), Infinity),
         allTimeSecs: allTime,
         gamesPlayedCount: topMap.size,
         topGames: [...topMap.entries()]
@@ -1087,7 +1144,7 @@ export function createMockApi(options: MockOptions = {}): Api {
           }))
           .sort((a, b) => b.totalSecs - a.totalSecs)
           .slice(0, 5),
-        recentSessions: [...sessions]
+        recentSessions: [...shown]
           .sort((a, b) => b.startedAt - a.startedAt || b.id - a.id)
           .slice(0, 10)
           .map(withGame),
@@ -1096,7 +1153,7 @@ export function createMockApi(options: MockOptions = {}): Api {
     async getDailyTotals(days, gameId) {
       const list =
         gameId === null
-          ? sessions
+          ? visibleSessions()
           : sessions.filter((s) => s.gameId === gameId);
       const out: DailyTotal[] = [];
       for (let i = days - 1; i >= 0; i--) {
@@ -1110,7 +1167,7 @@ export function createMockApi(options: MockOptions = {}): Api {
     },
     async getGameTotals(from, to, limit) {
       const map = new Map<number, number>();
-      sessions
+      visibleSessions()
         .filter(
           (s) =>
             (from === null || s.startedAt >= from) &&
@@ -1131,7 +1188,7 @@ export function createMockApi(options: MockOptions = {}): Api {
     async getHourlyTotals(days) {
       const rangeStart = localMidnight(now(), -(days - 1));
       const buckets = new Array<number>(24).fill(0);
-      for (const s of sessions) {
+      for (const s of visibleSessions()) {
         const end = s.endedAt ?? now();
         const span = end - s.startedAt;
         if (span <= 0) continue;

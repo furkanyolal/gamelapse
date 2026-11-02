@@ -8,6 +8,7 @@ const noSessionFilter = {
   to: null,
   limit: 1000,
   offset: 0,
+  includeHidden: false,
 };
 
 describe("mock api", () => {
@@ -72,7 +73,57 @@ describe("mock api", () => {
       afkDetectionEnabled: null,
     });
     expect(await api.listGames(false)).toHaveLength(7);
-    expect(await api.listGames(true)).toHaveLength(8);
+    expect(await api.listGames(true)).toHaveLength(10);
+  });
+
+  it("leaves hidden games out of totals and session lists", async () => {
+    const now = 1_800_000_000;
+    const api = createMockApi({ now: () => now });
+    const hidden = (await api.listGames(true)).filter((g) => g.game.hidden);
+    expect(hidden).toHaveLength(2);
+    expect(await api.listGames(false)).toHaveLength(8);
+    const hiddenIds = hidden.map((g) => g.game.id);
+
+    const shown = await api.listSessions(noSessionFilter);
+    expect(shown.some((s) => hiddenIds.includes(s.gameId))).toBe(false);
+    const all = await api.listSessions({
+      ...noSessionFilter,
+      includeHidden: true,
+    });
+    expect(all.some((s) => hiddenIds.includes(s.gameId))).toBe(true);
+    expect(all.length).toBeGreaterThan(shown.length);
+
+    const visibleToday = shown
+      .filter((s) => s.startedAt >= now - 86_400)
+      .reduce((n, s) => n + s.durationSecs, 0);
+    const stats = await api.getDashboardStats();
+    expect(stats.topGames.some((g) => hiddenIds.includes(g.gameId))).toBe(
+      false,
+    );
+    expect(stats.recentSessions.some((s) => hiddenIds.includes(s.gameId))).toBe(
+      false,
+    );
+    expect(stats.gamesPlayedCount).toBeLessThanOrEqual(8);
+    expect(visibleToday).toBeGreaterThanOrEqual(0);
+
+    const daily = await api.getDailyTotals(14, null);
+    const dailySum = daily.reduce((n, d) => n + d.totalSecs, 0);
+    const visibleSum = shown
+      .filter((s) => s.endedAt !== null)
+      .reduce((n, s) => n + s.durationSecs, 0);
+    expect(dailySum).toBeLessThanOrEqual(visibleSum);
+    const hiddenOnly = await api.getDailyTotals(14, hiddenIds[0]);
+    expect(hiddenOnly.some((d) => d.totalSecs > 0)).toBe(true);
+
+    const totals = await api.getGameTotals(null, null, 20);
+    expect(totals.some((g) => hiddenIds.includes(g.gameId))).toBe(false);
+  });
+
+  it("flags active sessions of hidden games", async () => {
+    const api = createMockApi();
+    const { active } = await api.getTrackerStatus();
+    expect(active.some((a) => a.hidden)).toBe(true);
+    expect(active.some((a) => !a.hidden)).toBe(true);
   });
 
   it("seeds demo data into an empty library only once", async () => {
@@ -80,6 +131,7 @@ describe("mock api", () => {
     await api.seedDemoData();
     await api.seedDemoData();
     expect(await api.listGames(false)).toHaveLength(8);
+    expect(await api.listGames(true)).toHaveLength(10);
   });
 
   it("creates, edits and deletes sessions", async () => {
@@ -155,17 +207,17 @@ describe("mock api", () => {
     expect(Math.abs(actual - expected)).toBeLessThanOrEqual(14);
   });
 
-  it("emits session-updated every second while subscribed", async () => {
+  it("emits session-updated every second per active session while subscribed", async () => {
     vi.useFakeTimers();
     try {
       const api = createMockApi();
       const handler = vi.fn();
       const off = api.on("session-updated", handler);
       vi.advanceTimersByTime(3000);
-      expect(handler).toHaveBeenCalledTimes(3);
+      expect(handler).toHaveBeenCalledTimes(6);
       off();
       vi.advanceTimersByTime(3000);
-      expect(handler).toHaveBeenCalledTimes(3);
+      expect(handler).toHaveBeenCalledTimes(6);
     } finally {
       vi.useRealTimers();
     }
@@ -297,7 +349,9 @@ describe("mock api: limits", () => {
     try {
       const api = createMockApi();
       const seen: ActiveSession[] = [];
-      const off = api.on("session-updated", (s) => seen.push(s));
+      const off = api.on("session-updated", (s) => {
+        if (!s.hidden) seen.push(s);
+      });
       vi.advanceTimersByTime(91_000);
       off();
       expect(seen[68].isAfk).toBe(false);

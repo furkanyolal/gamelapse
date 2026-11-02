@@ -7,6 +7,7 @@ const allSessions = {
   to: null,
   limit: 10_000,
   offset: 0,
+  includeHidden: false,
 };
 
 describe("mock tags", () => {
@@ -65,7 +66,7 @@ describe("mock merge", () => {
       survivor.sessionCount + expectedSessions,
     );
     expect(await api.listGameExecutables(survivor.game.id)).toHaveLength(3);
-    expect(await api.listGames(true)).toHaveLength(6);
+    expect(await api.listGames(true)).toHaveLength(8);
     await expect(api.getGame(mergedIds[0])).rejects.toThrow();
     const sessions = await api.listSessions(allSessions);
     expect(sessions.every((s) => !mergedIds.includes(s.gameId))).toBe(true);
@@ -77,7 +78,7 @@ describe("mock merge", () => {
     await expect(
       api.mergeGames(a.game.id, [b.game.id, a.game.id]),
     ).rejects.toThrow();
-    expect(await api.listGames(true)).toHaveLength(8);
+    expect(await api.listGames(true)).toHaveLength(10);
   });
 });
 
@@ -106,7 +107,10 @@ describe("mock export, backup and restore", () => {
       to: null,
       gameId: null,
     });
-    const sessions = await api.listSessions(allSessions);
+    const sessions = await api.listSessions({
+      ...allSessions,
+      includeHidden: true,
+    });
     expect(all?.sessions).toBe(sessions.length);
     expect(all?.games).toBe(new Set(sessions.map((s) => s.gameId)).size);
     expect(all?.path).toMatch(/gamelapse-sessions-\d{8}\.csv$/);

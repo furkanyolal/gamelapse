@@ -101,9 +101,11 @@ export default function Dashboard() {
         </EmptyState>
       )}
 
-      {status.data?.active.map((s) => (
-        <NowPlayingStrip key={s.sessionId} session={s} />
-      ))}
+      {status.data?.active
+        .filter((s) => !s.hidden)
+        .map((s) => (
+          <NowPlayingStrip key={s.sessionId} session={s} />
+        ))}
 
       {stats.error && (
         <ErrorState error={stats.error} onRetry={() => stats.refetch()} />

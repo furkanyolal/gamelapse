@@ -165,3 +165,55 @@ fn seeded_dashboard_matches_a_direct_sum() {
     let hourly = stats::hourly_totals(&conn, now, 61).unwrap();
     assert_eq!(hourly.iter().map(|h| h.total_secs).sum::<i64>(), direct);
 }
+
+#[test]
+fn baseline_counts_toward_all_time_only() {
+    let conn = test_db();
+    let game = add_game(&conn, "Foo", r"c:\foo.exe", MatchMode::ExactPath);
+    let other = add_game(&conn, "Bar", r"c:\bar.exe", MatchMode::ExactPath);
+    let midnight = stats::local_midnight(date(2026, 6, 10));
+    repo::insert_session(
+        &conn,
+        game,
+        midnight + 3600,
+        Some(midnight + 3600 + 1800),
+        SessionSource::Manual,
+        None,
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO imported_playtime (game_id, source, minutes, fetched_at) VALUES (?1, 'steam', 60, 0)",
+        [game],
+    )
+    .unwrap();
+    // A game with only a baseline still counts as played.
+    conn.execute(
+        "INSERT INTO imported_playtime (game_id, source, minutes, fetched_at) VALUES (?1, 'steam', 10, 0)",
+        [other],
+    )
+    .unwrap();
+    let now = midnight + 4 * 3600;
+
+    let summaries = stats::list_game_summaries(&conn, true, now).unwrap();
+    let s = summaries.iter().find(|s| s.game.id == game).unwrap();
+    assert_eq!(
+        (s.total_secs, s.today_secs, s.imported_minutes),
+        (5400, 1800, 60)
+    );
+
+    let dash = stats::dashboard(&conn, now).unwrap();
+    assert_eq!(dash.all_time_secs, 5400 + 600);
+    assert_eq!(dash.today_secs, 1800);
+    assert_eq!(dash.games_played_count, 2);
+    assert_eq!(dash.top_games[0].total_secs, 5400);
+
+    let all = stats::game_totals(&conn, now, None, None, 5).unwrap();
+    assert_eq!(
+        all.iter().map(|g| g.total_secs).collect::<Vec<_>>(),
+        vec![5400, 600]
+    );
+    let bounded =
+        stats::game_totals(&conn, now, Some(midnight), Some(midnight + 86400), 5).unwrap();
+    assert_eq!(bounded.len(), 1);
+    assert_eq!(bounded[0].total_secs, 1800);
+}

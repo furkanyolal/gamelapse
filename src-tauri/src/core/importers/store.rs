@@ -26,7 +26,18 @@ fn ensure_executable(
     Ok(added > 0)
 }
 
-/// Writes launcher playtime to `imported_playtime`. True when the stored minutes changed.
+/// The baseline to store: launcher playtime minus what Gamelapse tracked itself, never
+/// below the baseline already stored.
+fn baseline_minutes(existing: Option<i64>, launcher_minutes: i64, tracked_secs: i64) -> i64 {
+    let tracked_minutes = (tracked_secs / 60).max(0);
+    existing
+        .unwrap_or(0)
+        .max(launcher_minutes - tracked_minutes)
+        .max(0)
+}
+
+/// Writes launcher playtime as a baseline to `imported_playtime`, so it is not double counted
+/// with tracked sessions and never shrinks. True when the stored minutes changed.
 pub fn set_imported_playtime(
     conn: &Connection,
     game_id: i32,
@@ -41,6 +52,13 @@ pub fn set_imported_playtime(
             |r| r.get(0),
         )
         .optional()?;
+    let tracked_secs: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)), 0)
+         FROM sessions WHERE game_id = ?2",
+        params![now, game_id],
+        |r| r.get(0),
+    )?;
+    let minutes = baseline_minutes(current, minutes, tracked_secs);
     conn.execute(
         "INSERT INTO imported_playtime (game_id, source, minutes, fetched_at) VALUES (?1, ?2, ?3, ?4)
          ON CONFLICT(game_id, source) DO UPDATE SET minutes = excluded.minutes, fetched_at = excluded.fetched_at",
@@ -166,4 +184,30 @@ pub fn import_games(
         skipped,
         errors,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::baseline_minutes;
+
+    #[test]
+    fn first_import_stores_the_launcher_value() {
+        assert_eq!(baseline_minutes(None, 600, 0), 600);
+    }
+
+    #[test]
+    fn reimport_after_tracking_keeps_the_baseline() {
+        // 10 h baseline, 2 h tracked, launcher now reports 12 h.
+        assert_eq!(baseline_minutes(Some(600), 720, 2 * 3600), 600);
+    }
+
+    #[test]
+    fn lower_launcher_value_keeps_existing() {
+        assert_eq!(baseline_minutes(Some(600), 100, 0), 600);
+    }
+
+    #[test]
+    fn first_import_below_tracked_time_stores_zero() {
+        assert_eq!(baseline_minutes(None, 60, 2 * 3600), 0);
+    }
 }

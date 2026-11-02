@@ -178,17 +178,27 @@ pub fn game_totals(
     to: Option<i64>,
     limit: u32,
 ) -> AppResult<Vec<GameTotal>> {
+    // Launcher baselines belong to "all time", so only an unbounded query includes them.
+    let with_baseline = from.is_none() && to.is_none();
     let mut stmt = conn.prepare(
         "SELECT g.id, g.name,
-                SUM(MAX(0, COALESCE(s.ended_at, ?1) - s.started_at - s.afk_secs)) AS total
-         FROM sessions s JOIN games g ON g.id = s.game_id
-         WHERE (?2 IS NULL OR s.started_at >= ?2) AND (?3 IS NULL OR s.started_at < ?3)
-         GROUP BY g.id
-         HAVING total > 0
-         ORDER BY total DESC, g.sort_name
+                COALESCE(t.total, 0) + CASE WHEN ?5 THEN COALESCE(b.minutes, 0) * 60 ELSE 0 END AS grand
+         FROM games g
+         LEFT JOIN (
+             SELECT game_id,
+                    SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)) AS total
+             FROM sessions
+             WHERE (?2 IS NULL OR started_at >= ?2) AND (?3 IS NULL OR started_at < ?3)
+             GROUP BY game_id
+         ) t ON t.game_id = g.id
+         LEFT JOIN (
+             SELECT game_id, SUM(minutes) AS minutes FROM imported_playtime GROUP BY game_id
+         ) b ON b.game_id = g.id
+         WHERE grand > 0
+         ORDER BY grand DESC, g.sort_name
          LIMIT ?4",
     )?;
-    let rows = stmt.query_map(params![now, from, to, limit.max(1)], |r| {
+    let rows = stmt.query_map(params![now, from, to, limit.max(1), with_baseline], |r| {
         Ok(GameTotal {
             game_id: r.get(0)?,
             game_name: r.get(1)?,
@@ -200,13 +210,25 @@ pub fn game_totals(
 
 pub fn dashboard(conn: &Connection, now: i64) -> AppResult<DashboardStats> {
     let (week_start, today_start, tomorrow) = today_bounds(now);
-    let (all_time_secs, games_played_count): (i64, i32) = conn.query_row(
-        "SELECT COALESCE(SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)), 0),
-                COUNT(DISTINCT game_id)
+    let tracked_secs: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)), 0)
          FROM sessions",
         [now],
-        |r| Ok((r.get(0)?, r.get(1)?)),
+        |r| r.get(0),
     )?;
+    let baseline_minutes: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(minutes), 0) FROM imported_playtime",
+        [],
+        |r| r.get(0),
+    )?;
+    let games_played_count: i32 = conn.query_row(
+        "SELECT COUNT(*) FROM games
+         WHERE id IN (SELECT game_id FROM sessions)
+            OR id IN (SELECT game_id FROM imported_playtime WHERE minutes > 0)",
+        [],
+        |r| r.get(0),
+    )?;
+    let all_time_secs = tracked_secs + baseline_minutes * 60;
     Ok(DashboardStats {
         today_secs: range_secs(conn, today_start, tomorrow, now, None)?,
         week_secs: range_secs(conn, week_start, tomorrow, now, None)?,
@@ -257,7 +279,7 @@ fn summary_with_tags(
         week_secs: range_secs(conn, week_start, tomorrow, now, id)?,
         tags,
         game,
-        total_secs,
+        total_secs: total_secs + imported_minutes * 60,
         session_count,
         last_played_at,
         imported_minutes,

@@ -11,6 +11,15 @@ export function formatDuration(secs: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
+/** Splits seconds into whole hours and the remaining minutes (seconds dropped). */
+export function splitHoursMinutes(secs: number): {
+  hours: number;
+  minutes: number;
+} {
+  const total = Math.max(0, Math.floor(secs / 60));
+  return { hours: Math.floor(total / 60), minutes: total % 60 };
+}
+
 /** Clock-style duration for live timers: "1:05:09". */
 export function formatClock(secs: number): string {
   const total = Math.max(0, Math.floor(secs));

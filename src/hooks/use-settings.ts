@@ -22,6 +22,8 @@ export function useUpdateSettings() {
         trackingEnabled: null,
         theme: null,
         importOnStartup: null,
+        notificationsEnabled: null,
+        reminderIntervalSecs: null,
         ...patch,
       }),
     onSuccess: (settings) => {

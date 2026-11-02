@@ -6,8 +6,18 @@ import {
   formatRelative,
   formatRelativeShort,
   fromDateTimeLocal,
+  splitHoursMinutes,
   toDateTimeLocal,
 } from "@/lib/format";
+
+describe("splitHoursMinutes", () => {
+  it("splits seconds into hours and minutes", () => {
+    expect(splitHoursMinutes(8100)).toEqual({ hours: 2, minutes: 15 });
+    expect(splitHoursMinutes(86_400)).toEqual({ hours: 24, minutes: 0 });
+    expect(splitHoursMinutes(60)).toEqual({ hours: 0, minutes: 1 });
+    expect(splitHoursMinutes(-5)).toEqual({ hours: 0, minutes: 0 });
+  });
+});
 
 describe("formatDuration", () => {
   it("formats hours and minutes", () => {

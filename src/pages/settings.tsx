@@ -1,14 +1,24 @@
 import { useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import type { ImportSource, Settings as AppSettings, Theme } from "@/api";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import type {
+  ImportSource,
+  Limit,
+  Settings as AppSettings,
+  Theme,
+} from "@/api";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ImportDialog } from "@/components/import-dialog";
+import { LimitBar } from "@/components/limit-bar";
+import { LimitDialog } from "@/components/limit-dialog";
 import { PageHeader } from "@/components/page-header";
 import { ErrorState, RowsSkeleton } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -25,6 +35,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useAppInfo } from "@/hooks/use-app-info";
+import { useGames } from "@/hooks/use-games";
+import { useDeleteLimit, useLimits } from "@/hooks/use-limits";
 import {
   useFetchSteamPlaytime,
   useImportSources,
@@ -38,7 +50,8 @@ import {
   useUpdateSettings,
 } from "@/hooks/use-settings";
 import { useSetTrackingEnabled } from "@/hooks/use-tracker";
-import { formatRelativeShort } from "@/lib/format";
+import { formatDuration, formatRelativeShort } from "@/lib/format";
+import { limitTitle } from "@/lib/limits";
 import { SOURCE_LABELS } from "@/lib/import-sources";
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -219,6 +232,151 @@ function TrackingCard({ settings }: { settings: AppSettings }) {
           Save
         </Button>
       </CardContent>
+    </Card>
+  );
+}
+
+const REMINDER_CHOICES = [
+  { secs: 0, label: "Off" },
+  { secs: 1800, label: "30 min" },
+  { secs: 3600, label: "1 h" },
+  { secs: 7200, label: "2 h" },
+  { secs: 10800, label: "3 h" },
+];
+
+function LimitsCard({ settings }: { settings: AppSettings }) {
+  const limits = useLimits();
+  const games = useGames(true);
+  const remove = useDeleteLimit();
+  const update = useUpdateSettings();
+  const [editing, setEditing] = useState<Limit | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<Limit | null>(null);
+
+  const current = settings.reminderIntervalSecs;
+  const choices = REMINDER_CHOICES.some((c) => c.secs === current)
+    ? REMINDER_CHOICES
+    : [...REMINDER_CHOICES, { secs: current, label: formatDuration(current) }];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Limits</CardTitle>
+        <CardDescription>
+          Daily playtime caps and reminders. AFK time does not count.
+        </CardDescription>
+        <CardAction>
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus /> Add limit
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {limits.isPending && <RowsSkeleton rows={2} />}
+        {limits.error && (
+          <ErrorState error={limits.error} onRetry={() => limits.refetch()} />
+        )}
+        {limits.data?.length === 0 && (
+          <p className="text-muted-foreground text-sm">No limits set.</p>
+        )}
+        <ul className="divide-y">
+          {limits.data?.map((status) => (
+            <li key={status.limit.id} className="flex items-center gap-3 py-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate font-medium">
+                    {limitTitle(status)}
+                  </span>
+                  <Badge variant="secondary">
+                    {formatDuration(status.limit.dailySecs)} per day
+                  </Badge>
+                  {status.limit.action === "notify_repeat" && (
+                    <Badge variant="outline">Repeats</Badge>
+                  )}
+                </div>
+                <LimitBar status={status} />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Edit limit for ${limitTitle(status)}`}
+                onClick={() => setEditing(status.limit)}
+              >
+                <Pencil />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Delete limit for ${limitTitle(status)}`}
+                onClick={() => setDeleting(status.limit)}
+              >
+                <Trash2 />
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <SwitchRow
+          id="notifications-enabled"
+          label="Notifications"
+          description="Show a system notification when a limit or reminder fires."
+          checked={settings.notificationsEnabled}
+          onCheckedChange={(notificationsEnabled) =>
+            update.mutate({ notificationsEnabled })
+          }
+        />
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="reminder-interval">Play reminder</Label>
+            <p className="text-muted-foreground text-xs">
+              Remind me every so often while a game is running.
+            </p>
+          </div>
+          <Select
+            value={String(current)}
+            onValueChange={(v) =>
+              update.mutate({ reminderIntervalSecs: Number(v) })
+            }
+          >
+            <SelectTrigger id="reminder-interval" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {choices.map((c) => (
+                <SelectItem key={c.secs} value={String(c.secs)}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {update.error && (
+          <p role="alert" className="text-destructive text-sm">
+            {update.error.message}
+          </p>
+        )}
+      </CardContent>
+      {adding && (
+        <LimitDialog
+          open
+          onOpenChange={(open) => !open && setAdding(false)}
+          games={games.data ?? []}
+        />
+      )}
+      {editing && (
+        <LimitDialog
+          open
+          onOpenChange={(open) => !open && setEditing(null)}
+          games={games.data ?? []}
+          limit={editing}
+        />
+      )}
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Delete this limit?"
+        description="Playtime is no longer checked against it."
+        onConfirm={() => deleting && remove.mutate(deleting.id)}
+      />
     </Card>
   );
 }
@@ -456,6 +614,7 @@ export default function Settings() {
         <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
       )}
       {settings.data && <TrackingCard settings={settings.data} />}
+      {settings.data && <LimitsCard settings={settings.data} />}
       {settings.data && <ImportCard settings={settings.data} />}
       <SteamApiCard />
 

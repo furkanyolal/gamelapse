@@ -15,6 +15,9 @@ import type {
   ImportResult,
   ImportSource,
   ImportSourceStatus,
+  Limit,
+  LimitInput,
+  LimitStatus,
   MatchMode,
   Session,
   SessionQuery,
@@ -73,6 +76,10 @@ export interface Api {
   getSteamApiSettings(): Promise<SteamApiSettings>;
   setSteamApiSettings(settings: SteamApiSettings): Promise<null>;
   fetchSteamPlaytime(): Promise<ImportResult>;
+  listLimits(): Promise<LimitStatus[]>;
+  createLimit(input: LimitInput): Promise<Limit>;
+  updateLimit(limitId: number, input: LimitInput): Promise<Limit>;
+  deleteLimit(limitId: number): Promise<null>;
   /** Subscribe to a backend event; returns the unsubscribe function. */
   on<E extends ApiEventName>(
     event: E,

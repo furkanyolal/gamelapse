@@ -3,15 +3,9 @@ import { Square } from "lucide-react";
 import type { ActiveSession } from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useNow } from "@/hooks/use-now";
+import { useElapsed } from "@/hooks/use-elapsed";
 import { useStopSession } from "@/hooks/use-tracker";
 import { formatClock } from "@/lib/format";
-
-/** Elapsed play time of a session, ticking locally every second. */
-function useElapsed(session: ActiveSession): number {
-  const now = useNow();
-  return Math.max(0, now - session.startedAt - session.afkSecs);
-}
 
 export function Elapsed({ session }: { session: ActiveSession }) {
   return (

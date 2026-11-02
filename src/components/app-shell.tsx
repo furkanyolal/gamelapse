@@ -74,10 +74,15 @@ export function AppShell() {
               className="bg-sidebar-accent flex items-center gap-2 rounded-md px-3 py-2 text-xs"
               aria-label="Now playing"
             >
-              <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
+              <span
+                className={`size-2 shrink-0 rounded-full ${playing.isAfk ? "bg-amber-500" : "bg-emerald-500"}`}
+              />
               <span className="min-w-0 flex-1 truncate">
                 {playing.gameName}
               </span>
+              {playing.isAfk && (
+                <span className="text-muted-foreground font-medium">AFK</span>
+              )}
               <Elapsed session={playing} />
             </Link>
           )}

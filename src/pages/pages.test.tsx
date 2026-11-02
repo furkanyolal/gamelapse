@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,6 +40,22 @@ describe("Dashboard", () => {
     );
   });
 
+  it("shows the Limits today card when limits exist", async () => {
+    renderPage(<Dashboard />);
+    expect(await screen.findByText("Limits today")).toBeInTheDocument();
+    expect(await screen.findByText("All games")).toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(2);
+  });
+
+  it("hides the Limits today card when there are none", async () => {
+    const spy = vi.spyOn(api, "listLimits").mockResolvedValue([]);
+    renderPage(<Dashboard />);
+    expect(await screen.findByText("All time")).toBeInTheDocument();
+    await waitFor(() => expect(spy).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("Limits today")).not.toBeInTheDocument();
+  });
+
   it("shows an error state when stats fail", async () => {
     vi.spyOn(api, "getDashboardStats").mockRejectedValue(new Error("boom"));
     renderPage(<Dashboard />);
@@ -71,6 +87,22 @@ describe("Games import button", () => {
       await screen.findByRole("button", { name: /import/i }),
     );
     expect(await screen.findByText("Import games")).toBeInTheDocument();
+  });
+});
+
+describe("Settings limits", () => {
+  it("renders the Limits card with usage, notifications and reminders", async () => {
+    renderPage(<Settings />);
+    expect(await screen.findByText("Limits")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Edit limit for All games" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Delete limit for Factorio" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add limit/i })).toBeEnabled();
+    expect(screen.getByLabelText("Notifications")).toBeChecked();
+    expect(screen.getByLabelText("Play reminder")).toBeInTheDocument();
   });
 });
 

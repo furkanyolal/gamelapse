@@ -110,6 +110,45 @@ export interface Settings {
   trackingEnabled: boolean;
   theme: Theme;
   importOnStartup: boolean;
+  notificationsEnabled: boolean;
+  /** 0 means off; otherwise 300 to 14400 */
+  reminderIntervalSecs: number;
+}
+
+export type LimitScope = "global" | "game";
+/** notify: once per day when reached. notify_repeat: again every 15 minutes while still playing past it. */
+export type LimitAction = "notify" | "notify_repeat";
+
+export interface Limit {
+  id: number;
+  scope: LimitScope;
+  /** null for global */
+  gameId: number | null;
+  gameName: string | null;
+  dailySecs: number;
+  action: LimitAction;
+}
+
+export interface LimitInput {
+  scope: LimitScope;
+  gameId: number | null;
+  dailySecs: number;
+  action: LimitAction;
+}
+
+export interface LimitStatus {
+  limit: Limit;
+  /** Today's play counted against this limit, active sessions included, AFK excluded */
+  usedTodaySecs: number;
+  remainingSecs: number;
+  reached: boolean;
+}
+
+export interface Reminder {
+  sessionId: number;
+  gameId: number;
+  gameName: string;
+  elapsedSecs: number;
 }
 
 export type ImportSource = "steam" | "epic" | "gog";
@@ -158,6 +197,8 @@ export interface SettingsUpdate {
   trackingEnabled: boolean | null;
   theme: Theme | null;
   importOnStartup: boolean | null;
+  notificationsEnabled: boolean | null;
+  reminderIntervalSecs: number | null;
 }
 
 export interface GameUpdate {
@@ -188,6 +229,8 @@ export type ApiEventMap = {
   "tracker-status-changed": TrackerStatus;
   "library-changed": null;
   "sessions-changed": null;
+  "limit-reached": LimitStatus;
+  reminder: Reminder;
 };
 
 export type ApiEventName = keyof ApiEventMap;

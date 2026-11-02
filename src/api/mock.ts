@@ -13,6 +13,9 @@ import type {
   ImportResult,
   ImportSource,
   ImportSourceStatus,
+  Limit,
+  LimitInput,
+  LimitStatus,
   Session,
   SessionWithGame,
   Settings,
@@ -48,7 +51,18 @@ const DEFAULT_SETTINGS: Settings = {
   trackingEnabled: true,
   theme: "dark",
   importOnStartup: true,
+  notificationsEnabled: true,
+  reminderIntervalSecs: 0,
 };
+
+/** The fake active session goes AFK for the last 20 s of every 90 s cycle. */
+const AFK_CYCLE_SECS = 90;
+const AFK_SECS = 20;
+const REPEAT_NOTICE_SECS = 15 * 60;
+const MIN_LIMIT_SECS = 60;
+const MAX_LIMIT_SECS = 86_400;
+
+type StoredLimit = Omit<Limit, "gameName">;
 
 const STEAM_ROOT = "c:\\program files (x86)\\steam";
 const steamCover = (appId: string) =>
@@ -179,6 +193,16 @@ export function createMockApi(options: MockOptions = {}): Api {
     gog: null,
   };
   let steamApi: SteamApiSettings = { apiKey: null, steamId64: null };
+  let limits: StoredLimit[] = [];
+  let nextLimitId = 1;
+  let tickCount = 0;
+  let fakeAfkSessionId: number | null = null;
+  const afkSessions = new Set<number>();
+  /** Limits already reported as reached, so each fires once. */
+  const reachedLimits = new Set<number>();
+  const lastLimitNoticeAt = new Map<number, number>();
+  /** Last reminder multiple seen per session; the first sight is silent. */
+  const reminderBuckets = new Map<number, number>();
 
   const listeners = new Map<ApiEventName, Set<(payload: never) => void>>();
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -215,8 +239,66 @@ export function createMockApi(options: MockOptions = {}): Api {
       startedAt: s.startedAt,
       elapsedSecs: durationOf(s),
       afkSecs: s.afkSecs,
-      isAfk: false,
+      isAfk: afkSessions.has(s.id),
       source: s.source === "manual" ? "manual" : "auto",
+    };
+  }
+
+  function limitView(l: StoredLimit): Limit {
+    return {
+      ...l,
+      gameName: l.gameId === null ? null : gameName(l.gameId),
+    };
+  }
+
+  function statusOfLimit(l: StoredLimit): LimitStatus {
+    const own =
+      l.gameId === null
+        ? sessions
+        : sessions.filter((s) => s.gameId === l.gameId);
+    const used = sumWithin(own, localMidnight(now()), Infinity);
+    return {
+      limit: limitView(l),
+      usedTodaySecs: used,
+      remainingSecs: Math.max(0, l.dailySecs - used),
+      reached: used >= l.dailySecs,
+    };
+  }
+
+  function limitStatuses(): LimitStatus[] {
+    return [...limits]
+      .sort((a, b) => {
+        if (a.scope !== b.scope) return a.scope === "global" ? -1 : 1;
+        return gameName(a.gameId ?? 0).localeCompare(gameName(b.gameId ?? 0));
+      })
+      .map(statusOfLimit);
+  }
+
+  function checkedLimitInput(input: LimitInput, selfId: number | null) {
+    if (
+      !Number.isInteger(input.dailySecs) ||
+      input.dailySecs < MIN_LIMIT_SECS ||
+      input.dailySecs > MAX_LIMIT_SECS
+    ) {
+      throw new Error("A limit must be between 1 minute and 24 hours");
+    }
+    let gameId: number | null = null;
+    if (input.scope === "game") {
+      if (input.gameId === null) throw new Error("Choose a game for the limit");
+      gameId = requireGame(input.gameId).id;
+    }
+    if (limits.some((l) => l.id !== selfId && l.gameId === gameId)) {
+      throw new Error(
+        gameId === null
+          ? "A global limit already exists"
+          : `${gameName(gameId)} already has a limit`,
+      );
+    }
+    return {
+      scope: input.scope,
+      gameId,
+      dailySecs: input.dailySecs,
+      action: input.action,
     };
   }
 
@@ -444,7 +526,7 @@ export function createMockApi(options: MockOptions = {}): Api {
     }
     generated.forEach((s) => insertSession(s));
     if (withActive) {
-      insertSession({
+      const active = insertSession({
         gameId: demo[6].id,
         startedAt: now() - 25 * 60,
         endedAt: null,
@@ -453,15 +535,104 @@ export function createMockApi(options: MockOptions = {}): Api {
         source: "auto",
         note: null,
       });
+      fakeAfkSessionId = active.id;
+      limits.push(
+        {
+          id: nextLimitId++,
+          scope: "global",
+          gameId: null,
+          dailySecs: 4 * 3600,
+          action: "notify_repeat",
+        },
+        {
+          id: nextLimitId++,
+          scope: "game",
+          gameId: demo[6].id,
+          dailySecs: 2 * 3600,
+          action: "notify",
+        },
+      );
+      limitStatuses().forEach((st) => {
+        if (st.reached) reachedLimits.add(st.limit.id);
+      });
     }
+  }
+
+  function checkLimits() {
+    const activeGames = new Set(
+      activeSessions()
+        .filter((s) => !afkSessions.has(s.id))
+        .map((s) => s.gameId),
+    );
+    for (const st of limitStatuses()) {
+      const id = st.limit.id;
+      if (!st.reached) {
+        reachedLimits.delete(id);
+        continue;
+      }
+      const counted =
+        st.limit.gameId === null
+          ? activeGames.size > 0
+          : activeGames.has(st.limit.gameId);
+      const first = !reachedLimits.has(id);
+      const repeat =
+        !first &&
+        counted &&
+        st.limit.action === "notify_repeat" &&
+        now() - (lastLimitNoticeAt.get(id) ?? 0) >= REPEAT_NOTICE_SECS;
+      if (first || repeat) {
+        reachedLimits.add(id);
+        lastLimitNoticeAt.set(id, now());
+        emit("limit-reached", st);
+      }
+    }
+  }
+
+  function checkReminders() {
+    const interval = settings.reminderIntervalSecs;
+    if (interval <= 0) {
+      reminderBuckets.clear();
+      return;
+    }
+    for (const s of activeSessions()) {
+      if (afkSessions.has(s.id)) continue;
+      const elapsed = durationOf(s);
+      const bucket = Math.floor(elapsed / interval);
+      const prev = reminderBuckets.get(s.id);
+      reminderBuckets.set(s.id, bucket);
+      if (prev !== undefined && bucket > prev) {
+        emit("reminder", {
+          sessionId: s.id,
+          gameId: s.gameId,
+          gameName: gameName(s.gameId),
+          elapsedSecs: elapsed,
+        });
+      }
+    }
+  }
+
+  function tick() {
+    lastPollAt = now();
+    tickCount += 1;
+    const fake = sessions.find(
+      (s) => s.id === fakeAfkSessionId && s.endedAt === null,
+    );
+    if (fake) {
+      if (tickCount % AFK_CYCLE_SECS >= AFK_CYCLE_SECS - AFK_SECS) {
+        afkSessions.add(fake.id);
+        fake.afkSecs += 1;
+      } else {
+        afkSessions.delete(fake.id);
+      }
+    }
+    activeSessions().forEach((s) => emit("session-updated", toActive(s)));
+    checkLimits();
+    checkReminders();
   }
 
   function ensureTicker() {
     if (timer !== null || listenerCount() === 0) return;
-    timer = setInterval(() => {
-      lastPollAt = now();
-      activeSessions().forEach((s) => emit("session-updated", toActive(s)));
-    }, 1000);
+    timer = setInterval(tick, 1000);
   }
 
   function maybeStopTicker() {
@@ -477,6 +648,8 @@ export function createMockApi(options: MockOptions = {}): Api {
     const end = Math.max(now(), s.startedAt);
     s.endedAt = end;
     s.durationSecs = Math.max(0, end - s.startedAt - s.afkSecs);
+    afkSessions.delete(s.id);
+    reminderBuckets.delete(s.id);
     return { ...s };
   }
 
@@ -587,6 +760,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       games = games.filter((g) => g.id !== gameId);
       executables = executables.filter((e) => e.gameId !== gameId);
       sessions = sessions.filter((s) => s.gameId !== gameId);
+      limits = limits.filter((l) => l.gameId !== gameId);
       importedMinutes.delete(gameId);
       emit("library-changed", null);
       return null;
@@ -777,6 +951,19 @@ export function createMockApi(options: MockOptions = {}): Api {
       if (patch.importOnStartup !== null) {
         next.importOnStartup = patch.importOnStartup;
       }
+      if (patch.notificationsEnabled !== null) {
+        next.notificationsEnabled = patch.notificationsEnabled;
+      }
+      if (patch.reminderIntervalSecs !== null) {
+        const v = patch.reminderIntervalSecs;
+        if (v !== 0 && (v < 300 || v > 14_400)) {
+          throw new Error(
+            "Reminder interval must be off or 5 minutes to 4 hours",
+          );
+        }
+        if (v !== next.reminderIntervalSecs) reminderBuckets.clear();
+        next.reminderIntervalSecs = v;
+      }
       settings = next;
       return { ...settings };
     },
@@ -844,6 +1031,33 @@ export function createMockApi(options: MockOptions = {}): Api {
         skipped: 0,
         errors: [],
       };
+    },
+    async listLimits() {
+      return limitStatuses();
+    },
+    async createLimit(input) {
+      const limit: StoredLimit = {
+        id: nextLimitId,
+        ...checkedLimitInput(input, null),
+      };
+      nextLimitId += 1;
+      limits.push(limit);
+      return limitView(limit);
+    },
+    async updateLimit(limitId, input) {
+      const limit = limits.find((l) => l.id === limitId);
+      if (!limit) throw new Error(`Limit ${limitId} not found`);
+      Object.assign(limit, checkedLimitInput(input, limitId));
+      return limitView(limit);
+    },
+    async deleteLimit(limitId) {
+      if (!limits.some((l) => l.id === limitId)) {
+        throw new Error(`Limit ${limitId} not found`);
+      }
+      limits = limits.filter((l) => l.id !== limitId);
+      reachedLimits.delete(limitId);
+      lastLimitNoticeAt.delete(limitId);
+      return null;
     },
     on(event, handler) {
       let set = listeners.get(event);

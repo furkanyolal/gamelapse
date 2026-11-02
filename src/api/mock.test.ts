@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMockApi } from "@/api/mock";
+import type { ActiveSession, SettingsUpdate } from "@/api/types";
 
 const noSessionFilter = {
   gameId: null,
@@ -165,6 +166,190 @@ describe("mock api", () => {
       off();
       vi.advanceTimersByTime(3000);
       expect(handler).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+const noonToday = () => {
+  const d = new Date();
+  return Math.floor(
+    new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime() / 1000,
+  );
+};
+
+const settingsPatch = (patch: Partial<SettingsUpdate>): SettingsUpdate => ({
+  pollIntervalSecs: null,
+  afkThresholdSecs: null,
+  sessionMergeGapSecs: null,
+  requireForeground: null,
+  trackingEnabled: null,
+  theme: null,
+  importOnStartup: null,
+  notificationsEnabled: null,
+  reminderIntervalSecs: null,
+  ...patch,
+});
+
+describe("mock api: limits", () => {
+  it("seeds a global and a per-game limit, global first", async () => {
+    const api = createMockApi();
+    const list = await api.listLimits();
+    expect(list).toHaveLength(2);
+    expect(list[0].limit).toMatchObject({
+      scope: "global",
+      gameId: null,
+      gameName: null,
+      dailySecs: 4 * 3600,
+      action: "notify_repeat",
+    });
+    expect(list[1].limit).toMatchObject({
+      scope: "game",
+      gameName: "Factorio",
+      dailySecs: 2 * 3600,
+      action: "notify",
+    });
+  });
+
+  it("enforces uniqueness and the duration range", async () => {
+    const api = createMockApi();
+    const games = await api.listGames(false);
+    const other = games.find((g) => g.game.name === "Celeste")!.game;
+    const global = { scope: "global", gameId: null, dailySecs: 3600 } as const;
+    await expect(
+      api.createLimit({ ...global, action: "notify" }),
+    ).rejects.toThrow(/global limit already exists/);
+    const factorio = games.find((g) => g.game.name === "Factorio")!.game;
+    await expect(
+      api.createLimit({
+        scope: "game",
+        gameId: factorio.id,
+        dailySecs: 3600,
+        action: "notify",
+      }),
+    ).rejects.toThrow(/already has a limit/);
+    await expect(
+      api.createLimit({
+        scope: "game",
+        gameId: other.id,
+        dailySecs: 59,
+        action: "notify",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      api.createLimit({
+        scope: "game",
+        gameId: other.id,
+        dailySecs: 86_401,
+        action: "notify",
+      }),
+    ).rejects.toThrow();
+    const created = await api.createLimit({
+      scope: "game",
+      gameId: other.id,
+      dailySecs: 60,
+      action: "notify",
+    });
+    expect(created).toMatchObject({ gameName: "Celeste", dailySecs: 60 });
+    expect(await api.listLimits()).toHaveLength(3);
+  });
+
+  it("updates and deletes limits", async () => {
+    const api = createMockApi();
+    const [global, game] = await api.listLimits();
+    const updated = await api.updateLimit(game.limit.id, {
+      scope: "game",
+      gameId: game.limit.gameId,
+      dailySecs: 5400,
+      action: "notify_repeat",
+    });
+    expect(updated).toMatchObject({ dailySecs: 5400, action: "notify_repeat" });
+    await expect(
+      api.updateLimit(game.limit.id, {
+        scope: "global",
+        gameId: null,
+        dailySecs: 3600,
+        action: "notify",
+      }),
+    ).rejects.toThrow();
+    await api.deleteLimit(global.limit.id);
+    expect((await api.listLimits()).map((s) => s.limit.id)).toEqual([
+      game.limit.id,
+    ]);
+    await expect(api.deleteLimit(global.limit.id)).rejects.toThrow();
+  });
+
+  it("counts today's play including the active session", async () => {
+    const api = createMockApi({ now: noonToday });
+    const [global, game] = await api.listLimits();
+    expect(game.usedTodaySecs).toBeGreaterThanOrEqual(25 * 60);
+    expect(global.usedTodaySecs).toBeGreaterThanOrEqual(game.usedTodaySecs);
+    expect(game.remainingSecs).toBe(
+      Math.max(0, game.limit.dailySecs - game.usedTodaySecs),
+    );
+    expect(game.reached).toBe(game.usedTodaySecs >= game.limit.dailySecs);
+  });
+
+  it("goes AFK for 20 seconds of every 90 and freezes elapsed time", async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const seen: ActiveSession[] = [];
+      const off = api.on("session-updated", (s) => seen.push(s));
+      vi.advanceTimersByTime(91_000);
+      off();
+      expect(seen[68].isAfk).toBe(false);
+      expect(seen[69].isAfk).toBe(true);
+      expect(seen[88].isAfk).toBe(true);
+      expect(seen[89].isAfk).toBe(false);
+      expect(seen[70].elapsedSecs).toBe(seen[69].elapsedSecs);
+      expect(seen[70].afkSecs).toBe(seen[69].afkSecs + 1);
+      expect(seen[68].elapsedSecs).toBe(seen[69].elapsedSecs);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits limit-reached once when a limit is pushed over", async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const handler = vi.fn();
+      api.on("limit-reached", handler);
+      const [, game] = await api.listLimits();
+      await api.updateLimit(game.limit.id, {
+        scope: "game",
+        gameId: game.limit.gameId,
+        dailySecs: 60,
+        action: "notify",
+      });
+      vi.advanceTimersByTime(5000);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0]).toMatchObject({
+        reached: true,
+        limit: { id: game.limit.id },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits reminders at the configured interval", async () => {
+    vi.useFakeTimers();
+    try {
+      const api = createMockApi();
+      const handler = vi.fn();
+      api.on("reminder", handler);
+      vi.advanceTimersByTime(120_000);
+      expect(handler).not.toHaveBeenCalled();
+      await api.updateSettings(settingsPatch({ reminderIntervalSecs: 300 }));
+      vi.advanceTimersByTime(400_000);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler.mock.calls[0][0]).toMatchObject({ gameName: "Factorio" });
+      await expect(
+        api.updateSettings(settingsPatch({ reminderIntervalSecs: 100 })),
+      ).rejects.toThrow();
     } finally {
       vi.useRealTimers();
     }

@@ -27,6 +27,8 @@ export const keys = {
   importScan: (source: ImportSource) => ["import", "scan", source] as const,
   steamApi: ["steamApi"] as const,
   steamApiSettings: ["steamApi", "settings"] as const,
+  limits: ["limits"] as const,
+  limitsList: ["limits", "list"] as const,
 };
 
 type Family =
@@ -36,7 +38,8 @@ type Family =
   | "stats"
   | "settings"
   | "import"
-  | "steamApi";
+  | "steamApi"
+  | "limits";
 
 export function invalidateFamilies(client: QueryClient, ...families: Family[]) {
   return Promise.all(

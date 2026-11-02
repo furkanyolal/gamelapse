@@ -56,6 +56,10 @@ export function createTauriApi(): Api {
     setSteamApiSettings: (settings) =>
       call("set_steam_api_settings", { settings }),
     fetchSteamPlaytime: () => call("fetch_steam_playtime"),
+    listLimits: () => call("list_limits"),
+    createLimit: (input) => call("create_limit", { input }),
+    updateLimit: (limitId, input) => call("update_limit", { limitId, input }),
+    deleteLimit: (limitId) => call("delete_limit", { limitId }),
     on: (event, handler) => {
       // listen() is async; unsubscribe even if it is called before it resolves.
       let cancelled = false;

@@ -48,4 +48,5 @@ npm run build
 
 - Use npm (not pnpm/yarn).
 - Tracking runs in a Rust background task, never in the webview.
+- **Restart the app after backend changes.** A debug build loads the UI from the Vite dev server, so the frontend hot-reloads while the Rust process keeps the command set it was compiled with. A new command then fails with `Command <name> not found` until the app itself is rebuilt and restarted.
 - **Process safety: never kill a process you did not start.** No `Stop-Process` by name, no `taskkill /IM`, no `pkill`. Stop only a process by the exact PID you captured, and prefer commands that exit on their own. Do not run `npm run tauri dev` unless a task needs it.

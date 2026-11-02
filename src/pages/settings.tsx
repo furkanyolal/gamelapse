@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type {
@@ -882,8 +882,22 @@ function SteamApiCard() {
       <CardHeader>
         <CardTitle>Steam Web API</CardTitle>
         <CardDescription>
-          Fetch your Steam playtime. Get a key at steamcommunity.com/dev/apikey,
-          and make sure the game details of your profile are public.
+          Fetch your Steam playtime. Get a key at{" "}
+          <a
+            href="https://steamcommunity.com/dev/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="hover:underline"
+            onClick={(e) => {
+              if ("__TAURI_INTERNALS__" in window) {
+                e.preventDefault();
+                void openUrl("https://steamcommunity.com/dev/apikey");
+              }
+            }}
+          >
+            steamcommunity.com/dev/apikey
+          </a>
+          , and make sure the game details of your profile are public.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -127,4 +127,9 @@
   html {
     @apply font-sans;
   }
+  /* Thin scrollbars in theme colours instead of the default WebView2 look. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
 }

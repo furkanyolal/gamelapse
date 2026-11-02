@@ -28,6 +28,11 @@ export type OutputChecks = [
   Assert<Mutual<B.SessionSource, T.SessionSource>>,
   Assert<Mutual<B.MatchMode, T.MatchMode>>,
   Assert<Mutual<B.Theme, T.Theme>>,
+  Assert<Mutual<B.ImportSource, T.ImportSource>>,
+  Assert<Mutual<B.ImportSourceStatus_Serialize, T.ImportSourceStatus>>,
+  Assert<Mutual<B.DiscoveredGame_Serialize, T.DiscoveredGame>>,
+  Assert<Mutual<B.ImportResult, T.ImportResult>>,
+  Assert<Mutual<B.SteamApiSettings_Serialize, T.SteamApiSettings>>,
 ];
 
 export type InputChecks = [
@@ -35,4 +40,5 @@ export type InputChecks = [
   Assert<Accepts<T.GameUpdate, B.GameUpdate_Deserialize>>,
   Assert<Accepts<T.SessionUpdate, B.SessionUpdate_Deserialize>>,
   Assert<Accepts<T.SessionQuery, B.SessionQuery_Deserialize>>,
+  Assert<Accepts<T.SteamApiSettings, B.SteamApiSettings_Deserialize>>,
 ];

@@ -109,6 +109,51 @@ describe("mock api", () => {
     expect(await api.getHourlyTotals(30)).toHaveLength(24);
   });
 
+  it("never overlaps sessions or exceeds 14h in a local day", async () => {
+    const now = 1_800_000_000;
+    const api = createMockApi({ now: () => now });
+    const all = await api.listSessions(noSessionFilter);
+    expect(all.length).toBeGreaterThanOrEqual(100);
+    const spans = all
+      .map((s) => ({ from: s.startedAt, to: s.endedAt ?? now }))
+      .sort((a, b) => a.from - b.from);
+    for (let i = 1; i < spans.length; i++) {
+      expect(spans[i].from).toBeGreaterThanOrEqual(spans[i - 1].to);
+    }
+    for (const s of all) {
+      if (s.endedAt === null) continue;
+      expect(s.endedAt - s.startedAt).toBeGreaterThanOrEqual(600);
+      expect(s.endedAt - s.startedAt).toBeLessThanOrEqual(5 * 3600);
+    }
+    const daily = await api.getDailyTotals(60, null);
+    expect(Math.max(...daily.map((d) => d.totalSecs))).toBeLessThanOrEqual(
+      14 * 3600,
+    );
+    expect(daily.some((d) => d.totalSecs === 0)).toBe(true);
+  });
+
+  it("keeps 14-day totals consistent with sessions and the 30-day view", async () => {
+    const now = 1_800_000_000;
+    const api = createMockApi({ now: () => now });
+    const d14 = await api.getDailyTotals(14, null);
+    const d30 = await api.getDailyTotals(30, null);
+    expect(d14).toHaveLength(14);
+    expect(d14).toEqual(d30.slice(-14));
+    const start = new Date(now * 1000);
+    const from =
+      new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() - 13,
+      ).getTime() / 1000;
+    const all = await api.listSessions(noSessionFilter);
+    const expected = all
+      .filter((s) => s.startedAt >= from)
+      .reduce((n, s) => n + s.durationSecs, 0);
+    const actual = d14.reduce((n, d) => n + d.totalSecs, 0);
+    expect(Math.abs(actual - expected)).toBeLessThanOrEqual(14);
+  });
+
   it("emits session-updated every second while subscribed", async () => {
     vi.useFakeTimers();
     try {

@@ -5,8 +5,10 @@ import {
   LayoutDashboard,
   Settings,
 } from "lucide-react";
+import { Suspense } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { Elapsed } from "@/components/now-playing";
+import { RowsSkeleton } from "@/components/query-state";
 import { ThemeSync } from "@/components/theme-sync";
 import {
   Sidebar,
@@ -83,7 +85,9 @@ export function AppShell() {
       </Sidebar>
       <SidebarInset>
         <main className="p-6">
-          <Outlet />
+          <Suspense fallback={<RowsSkeleton rows={6} />}>
+            <Outlet />
+          </Suspense>
         </main>
       </SidebarInset>
     </SidebarProvider>

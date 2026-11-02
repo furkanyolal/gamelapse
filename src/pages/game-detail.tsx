@@ -46,7 +46,11 @@ import {
 import { useSessions } from "@/hooks/use-sessions";
 import { useDailyTotals } from "@/hooks/use-stats";
 import { useStartManualSession, useTrackerStatus } from "@/hooks/use-tracker";
-import { formatDateTime, formatDuration, formatRelative } from "@/lib/format";
+import {
+  formatDateTime,
+  formatDuration,
+  formatRelativeShort,
+} from "@/lib/format";
 
 const MATCH_MODES: { value: MatchMode; label: string }[] = [
   { value: "exact_path", label: "Exact path" },
@@ -167,7 +171,7 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
         <StatCard label="Sessions" value={String(summary.sessionCount)} />
         <StatCard
           label="Last played"
-          value={formatRelative(summary.lastPlayedAt)}
+          value={formatRelativeShort(summary.lastPlayedAt)}
         />
         {summary.importedMinutes > 0 && (
           <StatCard

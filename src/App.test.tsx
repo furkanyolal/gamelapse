@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import App from "@/App";
 
 describe("App shell", () => {
-  it("renders the sidebar navigation and the dashboard page", () => {
+  it("renders the sidebar navigation and the dashboard page", async () => {
     const client = new QueryClient();
     render(
       <QueryClientProvider client={client}>
@@ -23,7 +23,11 @@ describe("App shell", () => {
       expect(nav).toHaveTextContent(label);
     }
     expect(
-      screen.getByRole("heading", { name: "Dashboard" }),
+      await screen.findByRole(
+        "heading",
+        { name: "Dashboard" },
+        { timeout: 10_000 },
+      ),
     ).toBeInTheDocument();
   });
 });

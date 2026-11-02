@@ -239,43 +239,48 @@ export function createMockApi(options: MockOptions = {}): Api {
       return game;
     });
     const totalWeight = DEMO_GAMES.reduce((n, g) => n + g.weight, 0);
-    const generated: Omit<Session, "id">[] = [];
-    for (let i = 0; i < 120; i++) {
+    const pickGame = () => {
       let pick = rng() * totalWeight;
       let idx = 0;
       while (idx < DEMO_GAMES.length - 1 && pick >= DEMO_GAMES[idx].weight) {
         pick -= DEMO_GAMES[idx].weight;
         idx++;
       }
-      const daysAgo = Math.floor(Math.pow(rng(), 1.4) * 60);
-      const hour = 9 + Math.floor(rng() * 15);
-      const minute = Math.floor(rng() * 12) * 5;
-      const length = (10 + Math.floor(rng() * 290)) * 60;
-      const d = new Date(now() * 1000);
-      let startedAt =
-        new Date(
-          d.getFullYear(),
-          d.getMonth(),
-          d.getDate() - daysAgo,
-          hour,
-          minute,
-        ).getTime() / 1000;
-      // Keep finished sessions in the past, clear of the fake active one.
-      while (startedAt + length > now() - 1800) startedAt -= DAY;
-      const afkSecs = rng() < 0.1 ? Math.floor(length * 0.1) : 0;
-      generated.push({
-        gameId: demo[idx].id,
-        startedAt,
-        endedAt: startedAt + length,
-        durationSecs: length - afkSecs,
-        afkSecs,
-        source: "auto",
-        note: null,
-      });
+      return idx;
+    };
+    // Walk forward day by day, playing one game at a time so sessions never
+    // overlap, stay inside their own day and finish before the fake active one.
+    const generated: Omit<Session, "id">[] = [];
+    const lastEnd = now() - 1800;
+    for (let daysAgo = 59; daysAgo >= 0; daysAgo--) {
+      if (rng() > 0.8) continue;
+      const dayStart = localMidnight(now(), -daysAgo);
+      const dayEnd = Math.min(
+        localMidnight(now(), -daysAgo + 1) - 300,
+        lastEnd,
+      );
+      let cursor = dayStart + (9 + Math.floor(rng() * 11)) * 3600;
+      let budget = 12 * 3600;
+      const count = 1 + Math.floor(rng() * 4);
+      for (let n = 0; n < count; n++) {
+        const wanted = (10 + Math.floor(Math.pow(rng(), 1.6) * 290)) * 60;
+        const length = Math.min(wanted, budget, dayEnd - cursor);
+        if (length < 600) break;
+        const afkSecs = rng() < 0.1 ? Math.floor(length * 0.1) : 0;
+        generated.push({
+          gameId: demo[pickGame()].id,
+          startedAt: cursor,
+          endedAt: cursor + length,
+          durationSecs: length - afkSecs,
+          afkSecs,
+          source: "auto",
+          note: null,
+        });
+        budget -= length;
+        cursor += length + (10 + Math.floor(rng() * 110)) * 60;
+      }
     }
-    generated
-      .sort((a, b) => a.startedAt - b.startedAt)
-      .forEach((s) => insertSession(s));
+    generated.forEach((s) => insertSession(s));
     if (withActive) {
       insertSession({
         gameId: demo[6].id,

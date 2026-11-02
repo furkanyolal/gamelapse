@@ -11,6 +11,9 @@ Single source of truth for the Tauri commands, events and payload types shared b
 - Patch objects use `T | null` for every field. `null` means keep the current value. A nullable text field (for example a note) is cleared by sending an empty string.
 - Sessions that span local midnight are split across days for daily totals. Sessions that span an hour boundary are split across hours for hourly totals.
 - "Week" means the last 7 local days including today.
+- Ids and counts are `i32` in Rust (specta cannot export `i64`); timestamps and durations are `i64`, both `number` in TypeScript.
+- The generated `src/bindings.ts` exposes most structs as `Foo_Serialize` (what commands return) and `Foo_Deserialize` (what commands accept), with `Foo` as their union. The frontend's `src/api/types.ts` mirrors the `_Serialize` shapes and stays the frontend's source of truth; a compile-time check keeps the two aligned.
+- Events are emitted with `app.emit` and are not part of the generated bindings; their names and payloads are only defined here.
 
 ## Types
 

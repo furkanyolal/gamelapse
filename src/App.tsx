@@ -1,12 +1,14 @@
+import { lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 import { AppShell } from "@/components/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Dashboard from "@/pages/dashboard";
-import GameDetail from "@/pages/game-detail";
-import Games from "@/pages/games";
-import Sessions from "@/pages/sessions";
-import Settings from "@/pages/settings";
-import Stats from "@/pages/stats";
+
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const GameDetail = lazy(() => import("@/pages/game-detail"));
+const Games = lazy(() => import("@/pages/games"));
+const Sessions = lazy(() => import("@/pages/sessions"));
+const Settings = lazy(() => import("@/pages/settings"));
+const Stats = lazy(() => import("@/pages/stats"));
 
 export default function App() {
   return (

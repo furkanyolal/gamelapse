@@ -17,6 +17,25 @@ export default defineConfig(() => ({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("node_modules")) {
+            if (
+              /[\\/]node_modules[\\/](recharts|d3-[^\\/]+|victory-vendor)[\\/]/.test(
+                id,
+              )
+            ) {
+              return "recharts";
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
+
   test: {
     environment: "jsdom",
     globals: true,

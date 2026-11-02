@@ -4,6 +4,7 @@ import {
   formatDateTime,
   formatDuration,
   formatRelative,
+  formatRelativeShort,
   fromDateTimeLocal,
   toDateTimeLocal,
 } from "@/lib/format";
@@ -38,6 +39,19 @@ describe("date helpers", () => {
     const ts = Math.floor(Date.now() / 1000) - 3 * 3600;
     expect(formatRelative(ts)).toBe("about 3 hours ago");
     expect(formatRelative(null)).toBe("Never");
+  });
+
+  it("formats compact relative time", () => {
+    const now = 1_800_000_000;
+    const ago = (s: number) => formatRelativeShort(now - s, now);
+    expect(ago(10)).toBe("just now");
+    expect(ago(25 * 60)).toBe("25m ago");
+    expect(ago(7 * 3600)).toBe("7h ago");
+    expect(ago(4 * 86400)).toBe("4d ago");
+    expect(ago(25 * 86400)).toBe("3w ago");
+    expect(ago(150 * 86400)).toBe("5mo ago");
+    expect(ago(800 * 86400)).toBe("2y ago");
+    expect(formatRelativeShort(null)).toBe("Never");
   });
 
   it("round-trips datetime-local values", () => {

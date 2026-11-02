@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import type { DailyTotal, GameTotal, HourlyTotal } from "@/api";
@@ -35,11 +36,15 @@ export function DailyChart({
   data: DailyTotal[];
   height?: number;
 }) {
-  const rows = data.map((d) => ({
-    label: formatDayLabel(d.date),
-    hours: toHours(d.totalSecs),
-    secs: d.totalSecs,
-  }));
+  const rows = useMemo(
+    () =>
+      data.map((d) => ({
+        label: formatDayLabel(d.date),
+        hours: toHours(d.totalSecs),
+        secs: d.totalSecs,
+      })),
+    [data],
+  );
   return (
     <ChartContainer config={config} className="w-full" style={{ height }}>
       <BarChart data={rows} accessibilityLayer>
@@ -59,7 +64,12 @@ export function DailyChart({
           tickFormatter={hoursTick}
         />
         <ChartTooltip cursor={false} content={hoursTooltip()} />
-        <Bar dataKey="hours" fill="var(--color-hours)" radius={3} />
+        <Bar
+          dataKey="hours"
+          fill="var(--color-hours)"
+          radius={3}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ChartContainer>
   );
@@ -72,11 +82,15 @@ export function HourlyChart({
   data: HourlyTotal[];
   height?: number;
 }) {
-  const rows = data.map((d) => ({
-    label: `${String(d.hour).padStart(2, "0")}:00`,
-    hours: toHours(d.totalSecs),
-    secs: d.totalSecs,
-  }));
+  const rows = useMemo(
+    () =>
+      data.map((d) => ({
+        label: `${String(d.hour).padStart(2, "0")}:00`,
+        hours: toHours(d.totalSecs),
+        secs: d.totalSecs,
+      })),
+    [data],
+  );
   return (
     <ChartContainer config={config} className="w-full" style={{ height }}>
       <BarChart data={rows} accessibilityLayer>
@@ -95,7 +109,12 @@ export function HourlyChart({
           tickFormatter={hoursTick}
         />
         <ChartTooltip cursor={false} content={hoursTooltip()} />
-        <Bar dataKey="hours" fill="var(--color-hours)" radius={3} />
+        <Bar
+          dataKey="hours"
+          fill="var(--color-hours)"
+          radius={3}
+          isAnimationActive={false}
+        />
       </BarChart>
     </ChartContainer>
   );

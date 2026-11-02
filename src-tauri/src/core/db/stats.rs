@@ -4,9 +4,9 @@
 use chrono::{Duration, Local, NaiveDate, TimeZone, Timelike};
 use rusqlite::{Connection, params};
 
-use crate::core::db::repo;
+use crate::core::db::{library, repo};
 use crate::core::types::{
-    DailyTotal, DashboardStats, Game, GameSummary, GameTotal, HourlyTotal, SessionQuery,
+    DailyTotal, DashboardStats, Game, GameSummary, GameTotal, HourlyTotal, SessionQuery, Tag,
 };
 use crate::error::AppResult;
 
@@ -228,6 +228,16 @@ pub fn dashboard(conn: &Connection, now: i64) -> AppResult<DashboardStats> {
 }
 
 pub fn game_summary(conn: &Connection, game: Game, now: i64) -> AppResult<GameSummary> {
+    let tags = library::tags_for_game(conn, game.id)?;
+    summary_with_tags(conn, game, tags, now)
+}
+
+fn summary_with_tags(
+    conn: &Connection,
+    game: Game,
+    tags: Vec<Tag>,
+    now: i64,
+) -> AppResult<GameSummary> {
     let (week_start, today_start, tomorrow) = today_bounds(now);
     let (total_secs, session_count, last_played_at): (i64, i32, Option<i64>) = conn.query_row(
         "SELECT COALESCE(SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)), 0),
@@ -245,6 +255,7 @@ pub fn game_summary(conn: &Connection, game: Game, now: i64) -> AppResult<GameSu
     Ok(GameSummary {
         today_secs: range_secs(conn, today_start, tomorrow, now, id)?,
         week_secs: range_secs(conn, week_start, tomorrow, now, id)?,
+        tags,
         game,
         total_secs,
         session_count,
@@ -258,8 +269,13 @@ pub fn list_game_summaries(
     include_hidden: bool,
     now: i64,
 ) -> AppResult<Vec<GameSummary>> {
+    // One query for every game's tags instead of one per game.
+    let mut tags = library::tags_by_game(conn)?;
     repo::list_games(conn, include_hidden)?
         .into_iter()
-        .map(|g| game_summary(conn, g, now))
+        .map(|g| {
+            let game_tags = tags.remove(&g.id).unwrap_or_default();
+            summary_with_tags(conn, g, game_tags, now)
+        })
         .collect()
 }

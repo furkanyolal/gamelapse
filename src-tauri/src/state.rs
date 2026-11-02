@@ -1,6 +1,7 @@
 //! Shared application state managed by Tauri.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError, RwLock};
 
 use rusqlite::Connection;
@@ -16,6 +17,8 @@ pub struct AppState {
     pub tracker: Mutex<Tracker>,
     /// Cached copy of the persisted settings, read by the tracker on every poll.
     pub settings: RwLock<Settings>,
+    /// Set while the database file is being swapped; the poll loop skips its tick.
+    pub paused: AtomicBool,
     pub data_dir: PathBuf,
     pub db_path: PathBuf,
     pub log_dir: PathBuf,
@@ -28,6 +31,10 @@ impl AppState {
 
     pub fn tracker(&self) -> MutexGuard<'_, Tracker> {
         self.tracker.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(Ordering::SeqCst)
     }
 
     pub fn settings(&self) -> Settings {

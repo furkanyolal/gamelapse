@@ -1,5 +1,6 @@
 //! Core domain logic, independent of the Tauri command layer.
 
+pub mod custom_covers;
 pub mod db;
 pub mod export;
 pub mod idle;

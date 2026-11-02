@@ -126,6 +126,15 @@ pub fn update_game(conn: &Connection, id: i32, patch: &GameUpdate) -> AppResult<
     get_game(conn, id)
 }
 
+pub fn set_cover_path(conn: &Connection, id: i32, cover_path: Option<&str>) -> AppResult<Game> {
+    get_game(conn, id)?;
+    conn.execute(
+        "UPDATE games SET cover_path = ?1 WHERE id = ?2",
+        params![cover_path, id],
+    )?;
+    get_game(conn, id)
+}
+
 pub fn delete_game(conn: &Connection, id: i32) -> AppResult<()> {
     get_game(conn, id)?;
     if active_session_for_game(conn, id)?.is_some() {
@@ -315,6 +324,15 @@ pub fn last_heartbeat(conn: &Connection, session_id: i32) -> AppResult<Option<i6
             |r| r.get(0),
         )
         .optional()?)
+}
+
+/// True while any session is open, whatever its game.
+pub fn has_open_sessions(conn: &Connection) -> AppResult<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sessions WHERE ended_at IS NULL)",
+        [],
+        |r| r.get(0),
+    )?)
 }
 
 pub fn active_session_for_game(conn: &Connection, game_id: i32) -> AppResult<Option<Session>> {

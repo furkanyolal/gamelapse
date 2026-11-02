@@ -179,6 +179,8 @@ pub struct GameSummary {
     pub last_played_at: Option<i64>,
     #[specta(type = specta_typescript::Number)]
     pub imported_minutes: i64,
+    /// Sorted by name.
+    pub tags: Vec<Tag>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]
@@ -411,4 +413,57 @@ pub struct Reminder {
     pub game_name: String,
     #[specta(type = specta_typescript::Number)]
     pub elapsed_secs: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Tag {
+    pub id: i32,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeResult {
+    pub survivor_id: i32,
+    pub merged_sessions: i32,
+    pub merged_executables: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ExportFormat {
+    Csv,
+    Json,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportOptions {
+    pub format: ExportFormat,
+    /// Inclusive lower bound on startedAt.
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub from: Option<i64>,
+    /// Exclusive upper bound on startedAt.
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub to: Option<i64>,
+    pub game_id: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportResult {
+    pub path: String,
+    pub sessions: i32,
+    pub games: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupInfo {
+    pub path: String,
+    #[specta(type = specta_typescript::Number)]
+    pub created_at: i64,
+    #[specta(type = specta_typescript::Number)]
+    pub size_bytes: i64,
 }

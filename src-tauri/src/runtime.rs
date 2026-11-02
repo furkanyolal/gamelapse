@@ -174,6 +174,9 @@ fn poll_once(
     clock: &dyn Clock,
 ) {
     let state = app.state::<AppState>();
+    if state.is_paused() {
+        return;
+    }
     let settings = state.settings();
     // Enumerating processes is the slow part; do it before taking any lock.
     let snapshot = settings.tracking_enabled.then(|| source.snapshot());

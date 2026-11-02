@@ -4,6 +4,7 @@ pub mod error;
 pub mod runtime;
 pub mod state;
 
+use std::sync::atomic::AtomicBool;
 use std::sync::{Mutex, RwLock};
 
 use tauri::menu::{Menu, MenuItem};
@@ -64,6 +65,17 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::limits::create_limit,
         commands::limits::update_limit,
         commands::limits::delete_limit,
+        commands::library::list_tags,
+        commands::library::create_tag,
+        commands::library::rename_tag,
+        commands::library::delete_tag,
+        commands::library::set_game_tags,
+        commands::library::merge_games,
+        commands::library::pick_image,
+        commands::library::set_game_cover,
+        commands::data::export_data,
+        commands::data::backup_database,
+        commands::data::restore_database,
     ])
 }
 
@@ -171,6 +183,7 @@ pub fn run() {
                 db: Mutex::new(conn),
                 tracker: Mutex::new(core::tracker::Tracker::new()),
                 settings: RwLock::new(settings),
+                paused: AtomicBool::new(false),
                 data_dir,
                 db_path,
                 log_dir,

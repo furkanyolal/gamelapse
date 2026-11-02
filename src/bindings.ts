@@ -41,6 +41,18 @@ export const commands = {
 	createLimit: (input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("create_limit", { input })),
 	updateLimit: (limitId: number, input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("update_limit", { limitId, input })),
 	deleteLimit: (limitId: number) => typedError<null, string>(__TAURI_INVOKE("delete_limit", { limitId })),
+	listTags: () => typedError<Tag[], string>(__TAURI_INVOKE("list_tags")),
+	createTag: (name: string) => typedError<Tag, string>(__TAURI_INVOKE("create_tag", { name })),
+	renameTag: (tagId: number, name: string) => typedError<Tag, string>(__TAURI_INVOKE("rename_tag", { tagId, name })),
+	deleteTag: (tagId: number) => typedError<null, string>(__TAURI_INVOKE("delete_tag", { tagId })),
+	setGameTags: (gameId: number, tagIds: number[]) => typedError<Tag[], string>(__TAURI_INVOKE("set_game_tags", { gameId, tagIds })),
+	mergeGames: (survivorId: number, mergedIds: number[]) => typedError<MergeResult, string>(__TAURI_INVOKE("merge_games", { survivorId, mergedIds })),
+	/**  Native image picker. Async so the blocking dialog never runs on the main thread. */
+	pickImage: () => typedError<string | null, string>(__TAURI_INVOKE("pick_image")),
+	setGameCover: (gameId: number, sourcePath: string | null) => typedError<Game_Serialize, string>(__TAURI_INVOKE("set_game_cover", { gameId, sourcePath })),
+	exportData: (options: ExportOptions_Deserialize) => typedError<ExportResult | null, string>(__TAURI_INVOKE("export_data", { options })),
+	backupDatabase: () => typedError<BackupInfo | null, string>(__TAURI_INVOKE("backup_database")),
+	restoreDatabase: () => typedError<null, string>(__TAURI_INVOKE("restore_database")),
 };
 
 /* Types */
@@ -63,6 +75,12 @@ export type AppInfo = {
 	dataDir: string,
 	dbPath: string,
 	logDir: string,
+};
+
+export type BackupInfo = {
+	path: string,
+	createdAt: number,
+	sizeBytes: number,
 };
 
 export type DailyTotal = {
@@ -118,6 +136,34 @@ export type DiscoveredGame_Serialize = {
 	alreadyImported: boolean,
 };
 
+export type ExportFormat = "csv" | "json";
+
+export type ExportOptions = ExportOptions_Serialize | ExportOptions_Deserialize;
+
+export type ExportOptions_Deserialize = {
+	format: ExportFormat,
+	/**  Inclusive lower bound on startedAt. */
+	from?: number | null,
+	/**  Exclusive upper bound on startedAt. */
+	to?: number | null,
+	gameId?: number | null,
+};
+
+export type ExportOptions_Serialize = {
+	format: ExportFormat,
+	/**  Inclusive lower bound on startedAt. */
+	from: number | null,
+	/**  Exclusive upper bound on startedAt. */
+	to: number | null,
+	gameId: number | null,
+};
+
+export type ExportResult = {
+	path: string,
+	sessions: number,
+	games: number,
+};
+
 export type Game = Game_Serialize | Game_Deserialize;
 
 export type GameExecutable = {
@@ -139,6 +185,8 @@ export type GameSummary_Deserialize = {
 	sessionCount: number,
 	lastPlayedAt?: number | null,
 	importedMinutes: number,
+	/**  Sorted by name. */
+	tags: Tag[],
 };
 
 export type GameSummary_Serialize = {
@@ -149,6 +197,8 @@ export type GameSummary_Serialize = {
 	sessionCount: number,
 	lastPlayedAt: number | null,
 	importedMinutes: number,
+	/**  Sorted by name. */
+	tags: Tag[],
 };
 
 export type GameTotal = {
@@ -300,6 +350,12 @@ export type Limit_Serialize = {
 
 export type MatchMode = "exact_path" | "install_dir_prefix" | "exe_name";
 
+export type MergeResult = {
+	survivorId: number,
+	mergedSessions: number,
+	mergedExecutables: number,
+};
+
 export type Session = Session_Serialize | Session_Deserialize;
 
 export type SessionQuery = SessionQuery_Serialize | SessionQuery_Deserialize;
@@ -417,6 +473,11 @@ export type SteamApiSettings_Deserialize = {
 export type SteamApiSettings_Serialize = {
 	apiKey: string | null,
 	steamId64: string | null,
+};
+
+export type Tag = {
+	id: number,
+	name: string,
 };
 
 export type Theme = "dark" | "light" | "system";

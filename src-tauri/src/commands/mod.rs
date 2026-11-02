@@ -1,9 +1,11 @@
 //! Tauri commands exposed to the frontend, grouped by family.
 //! Lock order: tracker, then db (see `AppState`).
 
+pub mod data;
 pub mod dev;
 pub mod games;
 pub mod imports;
+pub mod library;
 pub mod limits;
 pub mod sessions;
 pub mod settings;

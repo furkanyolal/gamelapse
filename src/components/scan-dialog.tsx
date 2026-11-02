@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/api";
 import type { MetadataMatch, ScanCandidate, ScanSelection } from "@/api";
@@ -168,15 +169,22 @@ function ScanForm({
     () =>
       (candidates ?? []).map((c) => {
         const e = edits[c.folder] ?? {};
+        const m = matches[c.folder];
         return {
           c,
           checked: e.checked ?? defaultChecked(c),
           name: e.name ?? c.suggestedName,
           exePath: e.exePath ?? c.executables[0]?.path ?? "",
-          coverUrl: e.coverUrl ?? null,
+          // undefined means untouched: fall back to the best match's cover.
+          coverUrl:
+            e.coverUrl !== undefined
+              ? e.coverUrl
+              : m?.status === "done"
+                ? (m.match?.coverUrl ?? null)
+                : null,
         };
       }),
-    [candidates, edits],
+    [candidates, edits, matches],
   );
 
   function edit(folder: string, patch: RowEdit) {
@@ -258,13 +266,34 @@ function ScanForm({
                         />
                       </TableCell>
                       <TableCell className="space-y-1">
-                        <Input
-                          aria-label={`Name for ${r.c.suggestedName}`}
-                          value={r.name}
-                          onChange={(e) =>
-                            edit(r.c.folder, { name: e.target.value })
-                          }
-                        />
+                        <div className="flex items-center gap-2">
+                          {r.coverUrl && (
+                            <div className="relative shrink-0">
+                              <GameCover
+                                coverPath={r.coverUrl}
+                                className="h-8 w-16"
+                              />
+                              <button
+                                type="button"
+                                aria-label={`Clear cover for ${r.c.suggestedName}`}
+                                title="Remove cover"
+                                className="bg-background/90 hover:bg-background absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full border"
+                                onClick={() =>
+                                  edit(r.c.folder, { coverUrl: null })
+                                }
+                              >
+                                <X className="size-3" aria-hidden />
+                              </button>
+                            </div>
+                          )}
+                          <Input
+                            aria-label={`Name for ${r.c.suggestedName}`}
+                            value={r.name}
+                            onChange={(e) =>
+                              edit(r.c.folder, { name: e.target.value })
+                            }
+                          />
+                        </div>
                         <div className="flex items-center gap-2">
                           <span
                             className="text-muted-foreground max-w-48 truncate font-mono text-xs"

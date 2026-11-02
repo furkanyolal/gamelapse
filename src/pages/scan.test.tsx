@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScanDialog } from "@/components/scan-dialog";
+import { api } from "@/api";
 import GameDetail from "@/pages/game-detail";
 import Settings from "@/pages/settings";
 
@@ -55,6 +56,43 @@ describe("Scan dialog", () => {
     );
     await user.click(use);
     expect(input).toHaveValue("Hollow Knight");
+  });
+
+  it("pre-fills the cover from the best match, clears it, and sends it", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, "lookupGameMetadata").mockImplementation(async (name) => [
+      { steamAppId: 1, name, coverUrl: `https://img.test/${name}.jpg` },
+    ]);
+    const add = vi.spyOn(api, "addScannedGames").mockResolvedValue({
+      source: "steam",
+      discovered: 1,
+      added: 1,
+      updated: 0,
+      skipped: 0,
+      errors: [],
+    });
+    renderAt("/", <ScanDialog open onOpenChange={() => {}} />);
+    const clear = await screen.findByRole(
+      "button",
+      { name: "Clear cover for Hollow Knight" },
+      { timeout: 4000 },
+    );
+    await user.click(screen.getByRole("button", { name: /Add selected/ }));
+    expect(add).toHaveBeenLastCalledWith([
+      expect.objectContaining({
+        name: "Hollow Knight",
+        coverUrl: "https://img.test/Hollow Knight.jpg",
+      }),
+    ]);
+
+    await user.click(clear);
+    expect(
+      screen.queryByRole("button", { name: "Clear cover for Hollow Knight" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Add selected/ }));
+    expect(add).toHaveBeenLastCalledWith([
+      expect.objectContaining({ name: "Hollow Knight", coverUrl: null }),
+    ]);
   });
 });
 describe("Games folders card", () => {

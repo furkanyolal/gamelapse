@@ -1,7 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { Download, FolderSearch, Play, Plus } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Download,
+  FolderSearch,
+  Image as ImageIcon,
+  Play,
+  Plus,
+} from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/api";
 import { GameCover } from "@/components/game-cover";
 import { ImportDialog } from "@/components/import-dialog";
 import { PageHeader } from "@/components/page-header";
@@ -16,13 +24,23 @@ import { useAddGameFromExe, useGames } from "@/hooks/use-games";
 import { useScanRoots } from "@/hooks/use-scan";
 import { useTags } from "@/hooks/use-tags";
 import { useStartManualSession, useTrackerStatus } from "@/hooks/use-tracker";
+import { invalidateFamilies } from "@/hooks/query-keys";
+import { bumpCoverVersion } from "@/lib/assets";
 import { formatDuration, formatRelative } from "@/lib/format";
+
+/** Minimum gap between two metadata lookups. */
+const COVER_LOOKUP_GAP_MS = 300;
 
 export default function Games() {
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [finding, setFinding] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const client = useQueryClient();
   const navigate = useNavigate();
   const roots = useScanRoots();
   const games = useGames(showHidden);
@@ -46,6 +64,39 @@ export default function Games() {
     setSelectedTags((cur) =>
       cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id],
     );
+  }
+
+  const missing = visible?.filter((s) => !s.game.coverPath) ?? [];
+
+  async function findMissingCovers() {
+    const targets = missing.map((s) => ({ id: s.game.id, name: s.game.name }));
+    if (targets.length === 0) return;
+    setFinding({ done: 0, total: targets.length });
+    let found = 0;
+    let notFound = 0;
+    for (const [i, t] of targets.entries()) {
+      if (i > 0) await new Promise((r) => setTimeout(r, COVER_LOOKUP_GAP_MS));
+      try {
+        const [best] = await api.lookupGameMetadata(t.name);
+        if (best) {
+          await api.applyGameMetadata(t.id, best, false);
+          found += 1;
+        } else {
+          notFound += 1;
+        }
+      } catch {
+        notFound += 1;
+      }
+      setFinding({ done: i + 1, total: targets.length });
+    }
+    setFinding(null);
+    if (found > 0) {
+      bumpCoverVersion();
+      await invalidateFamilies(client, "games", "stats", "import");
+    }
+    const text = `Covers: ${found} found, ${notFound} not found.`;
+    if (notFound > 0) toast.warning(text);
+    else toast.success(text);
   }
 
   function handleAdd() {
@@ -73,6 +124,16 @@ export default function Games() {
             }}
           >
             <FolderSearch /> Scan folders
+          </Button>
+          <Button
+            variant="outline"
+            disabled={missing.length === 0 || finding !== null}
+            onClick={() => void findMissingCovers()}
+          >
+            <ImageIcon />{" "}
+            {finding
+              ? `Finding covers ${Math.min(finding.done + 1, finding.total)}/${finding.total}`
+              : "Find missing covers"}
           </Button>
           <Button onClick={handleAdd} disabled={addGame.isPending}>
             <Plus /> Add game

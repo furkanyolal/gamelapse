@@ -550,3 +550,94 @@ export interface UpdateProgress {
 - Dashboard: a dismissible banner when `startupHintDismissed` is false and autostart is off, offering "Enable" (calls `set_autostart(true)`) and "Not now"; both set `startupHintDismissed` to true.
 - Toast on `update-available` linking to Settings.
 - Query keys: `["autostart"]`, `["update", "check"]`. `set_autostart` invalidates `["autostart"]`; `check_for_update` results are cached until the next explicit check.
+
+## Phase 7: Heroic import, folder scan, metadata lookup
+
+Additions to the contract above, same conventions. Principle: Gamelapse never scans or watches folders on its own. A scan runs only when the user clicks Scan, and nothing enters the library until the user confirms it.
+
+### Types
+
+```ts
+// GameSource gains "amazon". ImportSource gains "heroic".
+
+export interface ScanRoot {
+  id: number;
+  path: string;
+  createdAt: number;
+}
+
+export interface ExeCandidate {
+  path: string;
+  sizeBytes: number;
+  /** Higher is more likely the main game executable */
+  score: number;
+  /** Short human-readable reasons, e.g. "name matches folder", "Unreal shipping exe" */
+  reasons: string[];
+}
+
+export interface ScanCandidate {
+  rootId: number;
+  /** Absolute path of the top-level folder under the root */
+  folder: string;
+  /** Cleaned from the folder name */
+  suggestedName: string;
+  /** Sorted by score, descending; junk executables excluded; at most 8 */
+  executables: ExeCandidate[];
+  confidence: "high" | "medium" | "low";
+  /** A library game already has an executable rule under this folder */
+  existingGameId: number | null;
+}
+
+export interface ScanSelection {
+  folder: string;
+  name: string;
+  exePath: string;
+  /** Optional cover to download, from a metadata match */
+  coverUrl: string | null;
+}
+
+export interface MetadataMatch {
+  steamAppId: number;
+  name: string;
+  coverUrl: string;
+}
+```
+
+### Commands
+
+| Command                | Arguments                                                   | Returns           | Notes                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pick_folder`          |                                                             | `string \| null`  | Native folder dialog.                                                                                                                                                                                                                       |
+| `list_scan_roots`      |                                                             | `ScanRoot[]`      | Sorted by path.                                                                                                                                                                                                                             |
+| `add_scan_root`        | `path: string`                                              | `ScanRoot`        | Error if not a directory, already added, or inside or containing an existing root.                                                                                                                                                          |
+| `remove_scan_root`     | `rootId: number`                                            | `null`            | Removing a root never touches games.                                                                                                                                                                                                        |
+| `scan_folders`         | `rootIds: number[] \| null`                                 | `ScanCandidate[]` | `null` means all roots. Walks at most 5 levels deep, skips reparse points, groups by top-level folder. Runs only from this command.                                                                                                         |
+| `add_scanned_games`    | `selection: ScanSelection[]`                                | `ImportResult`    | Creates `manual` games with `installDir` = folder, an `install_dir_prefix` rule for the folder and an `exact_path` rule for `exePath`; downloads `coverUrl` to `<app data>/covers/lookup/<gameId>.jpg` when given. Emits `library-changed`. |
+| `lookup_game_metadata` | `name: string`                                              | `MetadataMatch[]` | Steam store search, at most 5 matches. Error on network failure. Called only from the scan dialog (one candidate at a time, at least 300 ms apart) and the Find cover button.                                                               |
+| `apply_game_metadata`  | `gameId: number, match: MetadataMatch, renameGame: boolean` | `Game`            | Downloads the cover to `covers/lookup/<gameId>.jpg`, sets `coverPath`, renames when asked. Emits `library-changed`.                                                                                                                         |
+
+### Heroic import rules
+
+- Config dir: `%APPDATA%\heroic`. Available when it exists and holds at least one of the files below.
+- Epic through legendary: `legendaryConfig\legendary\installed.json`, a map of app name to `{ title, install_path, executable, app_name }`. Game `source = "epic"`, `sourceId = app_name` (the same id the official Epic importer uses, so a game seen by both appears once). Executable = `install_path\executable` when `executable` is non-empty. Cover: `legendaryConfig\legendary\metadata\<app_name>.json`, `keyImages` entry of type `DieselGameBoxTall`, else `DieselGameBox`, downloaded to `covers/epic/<app_name>.jpg`.
+- GOG through Heroic: `gog_store\installed.json` (`installed[]` with `appName`, `install_path`, `platform`) with titles and `art_cover` from `gog_store\library.json`. Only `platform = "windows"`. Game `source = "gog"`, `sourceId = appName`.
+- Amazon through nile: `nile_config\nile\installed.json`; game `source = "amazon"`. Titles from `nile_config\nile\library.json` when present.
+- Sideloaded: `sideload_apps\library.json`; game `source = "manual"`, `sourceId = "heroic-sideload:<app_name>"`, executable from the entry.
+- Skip entries whose install folder does not exist. Playtime: import minutes when Heroic stores them (check the real files on this PC); otherwise none.
+- Entries with DLC or add-on markers (`is_dlc`, an app name that differs from a `MainGameAppName`-style field) are skipped.
+
+### Scan rules
+
+- Executables are collected per top-level folder. Junk is excluded by file name patterns, case-insensitive: `unins*`, `setup*`, `install*`, `*redist*`, `vc_redist*`, `dxsetup*`, `dotnet*`, `*crash*`, `*handler*`, `*report*`, `UnrealCEFSubProcess*`, `*EasyAntiCheat*`, `BEService*`, `*uninstall*`, `python*`, `java*`, `node*`, files under `redist`, `_CommonRedist`, `DirectX`, `vcredist`, `dotnet`, `EasyAntiCheat` or `__Installer` folders, and files smaller than 512 KB.
+- Score, additive: name matches the cleaned folder name +40; ends with `-Win64-Shipping.exe` +35; sits in the folder root or in `bin`, `Binaries\Win64`, `x64` +15; largest executable in the folder +20; name contains `launcher` -15; name contains `server`, `editor`, `benchmark`, `tool`, `config` -25.
+- Confidence: high when the top score is at least 60 and leads the runner-up by 20 or more; medium when the top score is at least 30; otherwise low.
+- Name cleanup: replace `-`, `_` and `.` with spaces; drop bracketed tags, version numbers (`v1.2`, `1.02`, `Build 123`), years in parentheses, and words `repack`, `fitgirl`, `dodi`, `elamigos`, `ankergames`, `goldberg`, `multi12` style tags; collapse spaces; title case.
+- `existingGameId` is set when any library executable rule lies under the folder.
+
+### Frontend
+
+- Settings page: the Import card gains a Heroic row. A new "Games folders" card lists the roots with Add folder (`pick_folder` then `add_scan_root`), Remove, and a "Scan folders" button, with the line "Gamelapse scans only when you click Scan and adds only what you confirm."
+- Scan dialog: progress while scanning, then one row per candidate: checkbox (checked by default for high confidence without `existingGameId`), editable name, executable select (score and reasons as a tooltip), a "Match" column that runs `lookup_game_metadata` for the visible candidates one at a time and shows the best match's name and thumbnail with a "Use" action that fills the name and sets `coverUrl`, and an "Add selected" button that calls `add_scanned_games` and shows the result. Candidates with `existingGameId` show an "In library" badge.
+- Games page: a "Scan folders" button next to Import. With no roots, it opens Settings to the Games folders card.
+- Game detail: a "Find cover" button opening a lookup dialog (search box prefilled with the name, matches with thumbnails, "Use cover" and "Use cover and name").
+- Query keys: `["scanRoots", "list"]`, `["scan", "candidates"]`, `["metadata", name]`. Root mutations invalidate `["scanRoots"]`; `add_scanned_games` and `apply_game_metadata` invalidate `["games"]`, `["stats"]`, `["import"]`.

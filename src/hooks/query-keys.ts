@@ -27,6 +27,7 @@ export const keys = {
   import: ["import"] as const,
   importSources: ["import", "sources"] as const,
   importScan: (source: ImportSource) => ["import", "scan", source] as const,
+  importIgnored: ["import", "ignored"] as const,
   steamApi: ["steamApi"] as const,
   steamApiSettings: ["steamApi", "settings"] as const,
   scanRoots: ["scanRoots"] as const,

@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import type { ImportResult, ImportSource } from "@/api";
+import { toast } from "sonner";
+import type {
+  DiscoveredGame,
+  GameSource,
+  ImportResult,
+  ImportSource,
+} from "@/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,8 +33,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  useIgnoredImports,
   useImportGames,
   useImportSources,
+  useRestoreIgnoredImport,
   useScanImportSource,
 } from "@/hooks/use-import";
 import { formatDuration } from "@/lib/format";
@@ -47,6 +55,8 @@ function ImportForm({ initialSource }: { initialSource: ImportSource | null }) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const scan = useScanImportSource(source);
   const importGames = useImportGames();
+  const ignored = useIgnoredImports();
+  const restoreIgnored = useRestoreIgnoredImport();
 
   const { refetch } = scan;
   useEffect(() => {
@@ -54,7 +64,28 @@ function ImportForm({ initialSource }: { initialSource: ImportSource | null }) {
   }, [initialSource, refetch]);
 
   const found = scan.data;
-  const newCount = found?.filter((g) => !g.alreadyImported).length ?? 0;
+  const newCount =
+    found?.filter((g) => !g.alreadyImported && !g.ignored).length ?? 0;
+  const importable = found?.some((g) => !g.ignored) ?? false;
+
+  function restore(g: DiscoveredGame) {
+    // Heroic rows carry the launcher id; the ignore list stores the game source.
+    const gameSource =
+      ignored.data?.find((i) => i.sourceId === g.sourceId)?.source ??
+      (g.source as GameSource);
+    restoreIgnored.mutate(
+      { source: gameSource, sourceId: g.sourceId, importSource: g.source },
+      {
+        onSuccess: (r) => {
+          toast.success(
+            `Restored ${g.name}: added ${r.added}, updated ${r.updated}, skipped ${r.skipped}.`,
+          );
+          void refetch();
+        },
+        onError: (e) => toast.error(e.message),
+      },
+    );
+  }
 
   function pick(next: string) {
     setSource(next as ImportSource);
@@ -150,8 +181,23 @@ function ImportForm({ initialSource }: { initialSource: ImportSource | null }) {
                       : formatDuration(g.playtimeMinutes * 60)}
                   </TableCell>
                   <TableCell>
-                    {g.alreadyImported && (
-                      <Badge variant="secondary">Already imported</Badge>
+                    {g.ignored ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <Badge variant="outline">Ignored</Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={`Restore ${g.name}`}
+                          disabled={restoreIgnored.isPending}
+                          onClick={() => restore(g)}
+                        >
+                          Restore
+                        </Button>
+                      </div>
+                    ) : (
+                      g.alreadyImported && (
+                        <Badge variant="secondary">Already imported</Badge>
+                      )
                     )}
                   </TableCell>
                 </TableRow>
@@ -179,7 +225,7 @@ function ImportForm({ initialSource }: { initialSource: ImportSource | null }) {
 
       <DialogFooter>
         <Button
-          disabled={!source || !found?.length || importGames.isPending}
+          disabled={!source || !importable || importGames.isPending}
           onClick={runImport}
         >
           {importGames.isPending

@@ -52,6 +52,9 @@ export function createTauriApi(): Api {
     listImportSources: () => call("list_import_sources"),
     scanImportSource: (source) => call("scan_import_source", { source }),
     importGames: (source) => call("import_games", { source }),
+    listIgnoredImports: () => call("list_ignored_imports"),
+    restoreIgnoredImport: (source, sourceId) =>
+      call("restore_ignored_import", { source, sourceId }),
     getSteamApiSettings: () => call("get_steam_api_settings"),
     setSteamApiSettings: (settings) =>
       call("set_steam_api_settings", { settings }),

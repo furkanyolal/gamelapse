@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api";
-import type { ImportSource, SteamApiSettings } from "@/api";
+import type { GameSource, ImportSource, SteamApiSettings } from "@/api";
 import { invalidateFamilies, keys } from "@/hooks/query-keys";
 
 export function useImportSources() {
@@ -25,6 +25,29 @@ export function useImportGames() {
   return useMutation({
     mutationFn: (source: ImportSource) => api.importGames(source),
     onSuccess: () => invalidateFamilies(client, "games", "stats", "import"),
+  });
+}
+
+export function useIgnoredImports() {
+  return useQuery({
+    queryKey: keys.importIgnored,
+    queryFn: () => api.listIgnoredImports(),
+  });
+}
+
+/** Un-ignores a game, then imports its source so it comes back. */
+export function useRestoreIgnoredImport() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: {
+      source: GameSource;
+      sourceId: string;
+      importSource: ImportSource;
+    }) => {
+      await api.restoreIgnoredImport(v.source, v.sourceId);
+      return api.importGames(v.importSource);
+    },
+    onSettled: () => invalidateFamilies(client, "import", "games", "stats"),
   });
 }
 

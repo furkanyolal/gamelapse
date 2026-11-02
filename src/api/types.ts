@@ -253,6 +253,15 @@ export interface DiscoveredGame {
   playtimeMinutes: number | null;
   /** A game with this source and sourceId already exists */
   alreadyImported: boolean;
+  /** The user deleted this game earlier; imports skip it until restored */
+  ignored: boolean;
+}
+
+export interface IgnoredImport {
+  source: GameSource;
+  sourceId: string;
+  name: string;
+  ignoredAt: number;
 }
 
 export interface ImportResult {

@@ -15,6 +15,7 @@ import type {
   ScanRoot,
   HourlyTotal,
   DiscoveredGame,
+  IgnoredImport,
   ImportResult,
   ImportSource,
   ImportSourceStatus,
@@ -87,7 +88,7 @@ const STEAM_ROOT = "c:\\program files (x86)\\steam";
 const steamCover = (appId: string) =>
   `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`;
 
-type CatalogEntry = Omit<DiscoveredGame, "alreadyImported"> & {
+type CatalogEntry = Omit<DiscoveredGame, "alreadyImported" | "ignored"> & {
   /** Counts as imported from the start, as if an earlier run had added it. */
   preImported?: boolean;
   /** Source of the created game, when it differs from the import source. */
@@ -242,6 +243,7 @@ export function createMockApi(options: MockOptions = {}): Api {
   const rng = mulberry32(options.seed ?? 42);
 
   let games: Game[] = [];
+  let ignoredImports: IgnoredImport[] = [];
   let executables: GameExecutable[] = [];
   let sessions: Session[] = [];
   let settings: Settings = { ...DEFAULT_SETTINGS };
@@ -582,6 +584,11 @@ export function createMockApi(options: MockOptions = {}): Api {
         alreadyImported:
           findImported(source, entry.sourceId) !== undefined ||
           preImported === true,
+        ignored: ignoredImports.some(
+          (i) =>
+            i.source === (entry.gameSource ?? (source as GameSource)) &&
+            i.sourceId === entry.sourceId,
+        ),
       }),
     );
   }
@@ -597,6 +604,10 @@ export function createMockApi(options: MockOptions = {}): Api {
       errors: [],
     };
     for (const d of found) {
+      if (d.ignored) {
+        result.skipped += 1;
+        continue;
+      }
       const existing = findImported(source, d.sourceId);
       if (existing) {
         existing.installDir = d.installDir;
@@ -1031,9 +1042,25 @@ export function createMockApi(options: MockOptions = {}): Api {
       return { ...game };
     },
     async deleteGame(gameId) {
-      requireGame(gameId);
+      const doomed = requireGame(gameId);
       if (activeSessions().some((s) => s.gameId === gameId)) {
         throw new Error("Stop the active session before deleting this game");
+      }
+      // Demo games carry a "demo-N" id under source "manual"; real hand-made
+      // games have no sourceId at all.
+      if (doomed.sourceId !== null && doomed.source !== "manual") {
+        const { source, sourceId } = doomed;
+        ignoredImports = [
+          {
+            source,
+            sourceId: sourceId as string,
+            name: doomed.name,
+            ignoredAt: now(),
+          },
+          ...ignoredImports.filter(
+            (i) => !(i.source === source && i.sourceId === sourceId),
+          ),
+        ];
       }
       games = games.filter((g) => g.id !== gameId);
       executables = executables.filter((e) => e.gameId !== gameId);
@@ -1281,6 +1308,16 @@ export function createMockApi(options: MockOptions = {}): Api {
       const result = importOf(source);
       emit("library-changed", null);
       return result;
+    },
+    async listIgnoredImports() {
+      return ignoredImports.map((i) => ({ ...i }));
+    },
+    async restoreIgnoredImport(source, sourceId) {
+      ignoredImports = ignoredImports.filter(
+        (i) => !(i.source === source && i.sourceId === sourceId),
+      );
+      emit("library-changed", null);
+      return null;
     },
     async getSteamApiSettings() {
       return { ...steamApi };

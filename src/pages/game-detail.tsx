@@ -377,7 +377,11 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete ${game.name}?`}
-        description="This removes the game, its executables and all of its sessions. It cannot be undone."
+        description={`This removes the game, its executables and all of its sessions. It cannot be undone.${
+          game.sourceId !== null
+            ? " It will not be re-imported. You can restore it from the Import dialog."
+            : ""
+        }`}
         onConfirm={() =>
           del.mutate(game.id, { onSuccess: () => navigate("/games") })
         }

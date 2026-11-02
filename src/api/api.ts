@@ -13,7 +13,9 @@ import type {
   DiscoveredGame,
   Game,
   GameExecutable,
+  GameSource,
   GameSummary,
+  IgnoredImport,
   GameTotal,
   GameUpdate,
   HourlyTotal,
@@ -83,6 +85,8 @@ export interface Api {
   listImportSources(): Promise<ImportSourceStatus[]>;
   scanImportSource(source: ImportSource): Promise<DiscoveredGame[]>;
   importGames(source: ImportSource): Promise<ImportResult>;
+  listIgnoredImports(): Promise<IgnoredImport[]>;
+  restoreIgnoredImport(source: GameSource, sourceId: string): Promise<null>;
   getSteamApiSettings(): Promise<SteamApiSettings>;
   setSteamApiSettings(settings: SteamApiSettings): Promise<null>;
   fetchSteamPlaytime(): Promise<ImportResult>;

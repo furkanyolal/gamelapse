@@ -70,7 +70,7 @@ pub fn merge_games(
         // Holding the tracker lock keeps a poll from starting a session mid-merge.
         let _tracker = state.tracker();
         let db = state.db();
-        library::merge_games(&db, survivor_id, &merged_ids)?
+        library::merge_games(&db, survivor_id, &merged_ids, super::now())?
     };
     for id in &merged_ids {
         custom_covers::remove(&state.data_dir, *id);

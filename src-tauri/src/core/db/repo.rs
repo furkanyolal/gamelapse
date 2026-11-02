@@ -143,15 +143,22 @@ pub fn delete_game(conn: &Connection, id: i32, now: i64) -> AppResult<()> {
         return Err(err("game has an active session; stop it first"));
     }
     let tx = conn.unchecked_transaction()?;
+    ignore_import(&tx, &game, now)?;
+    tx.execute("DELETE FROM games WHERE id = ?1", [id])?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Writes the `ignored_imports` tombstone for a launcher game about to be removed; a game
+/// without a `source_id` leaves none.
+pub fn ignore_import(conn: &Connection, game: &Game, now: i64) -> AppResult<()> {
     if let Some(source_id) = &game.source_id {
-        tx.execute(
+        conn.execute(
             "INSERT INTO ignored_imports (source, source_id, name, ignored_at) VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(source, source_id) DO UPDATE SET name = excluded.name, ignored_at = excluded.ignored_at",
             params![game.source.as_str(), source_id, game.name, now],
         )?;
     }
-    tx.execute("DELETE FROM games WHERE id = ?1", [id])?;
-    tx.commit()?;
     Ok(())
 }
 

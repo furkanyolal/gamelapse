@@ -150,7 +150,8 @@ pub fn set_game_tags(conn: &Connection, game_id: i32, tag_ids: &[i32]) -> AppRes
 /// Sessions move as they are. Executables move unless the survivor already has the same path
 /// (the table is unique on game and path, so a rule with a different mode counts as a
 /// duplicate too). Tags are unioned. Imported playtime keeps the larger value per source.
-/// Limits of merged games are deleted with them.
+/// Limits of merged games are deleted with them. Merged launcher games get an
+/// `ignored_imports` tombstone, like a delete.
 ///
 /// Errors, changing nothing, if the survivor is among the merged games, if any game does not
 /// exist, or if any involved game has an active session.
@@ -158,6 +159,7 @@ pub fn merge_games(
     conn: &Connection,
     survivor_id: i32,
     merged_ids: &[i32],
+    now: i64,
 ) -> AppResult<MergeResult> {
     let mut merged: Vec<i32> = Vec::new();
     for id in merged_ids {
@@ -211,6 +213,8 @@ pub fn merge_games(
         )?;
     }
     for id in &merged {
+        // Tombstone first so the next import does not recreate the game as a duplicate.
+        repo::ignore_import(&tx, &repo::get_game(&tx, *id)?, now)?;
         // Cascades to leftover duplicate executables, tags, playtime rows and limits.
         tx.execute("DELETE FROM games WHERE id = ?1", [id])?;
     }

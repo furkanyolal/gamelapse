@@ -2,7 +2,7 @@ mod common;
 
 use common::{add_game, test_db};
 use gamelapse_lib::core::db::{library, repo, stats};
-use gamelapse_lib::core::types::{MatchMode, SessionSource};
+use gamelapse_lib::core::types::{GameSource, MatchMode, SessionSource};
 use rusqlite::params;
 
 fn tag_names(tags: &[gamelapse_lib::core::types::Tag]) -> Vec<&str> {
@@ -133,7 +133,7 @@ fn merge_moves_everything_onto_the_survivor() {
     put(dup, "gog", 10, 4);
     put(dup, "epic", 5, 5);
 
-    let result = library::merge_games(&conn, keep, &[dup, other, dup]).unwrap();
+    let result = library::merge_games(&conn, keep, &[dup, other, dup], 100).unwrap();
     assert_eq!(result.survivor_id, keep);
     assert_eq!(result.merged_sessions, 3);
     assert_eq!(result.merged_executables, 2); // dup's unique rule and other's rule
@@ -191,15 +191,15 @@ fn merge_rejects_bad_input_and_changes_nothing() {
     let idle = add_game(&conn, "Idle", r"c:\i.exe", MatchMode::ExactPath);
     session(&conn, idle, 10, Some(20));
 
-    assert!(library::merge_games(&conn, keep, &[keep, idle]).is_err());
-    assert!(library::merge_games(&conn, keep, &[]).is_err());
-    assert!(library::merge_games(&conn, keep, &[idle, 999]).is_err());
-    assert!(library::merge_games(&conn, 999, &[idle]).is_err());
+    assert!(library::merge_games(&conn, keep, &[keep, idle], 100).is_err());
+    assert!(library::merge_games(&conn, keep, &[], 100).is_err());
+    assert!(library::merge_games(&conn, keep, &[idle, 999], 100).is_err());
+    assert!(library::merge_games(&conn, 999, &[idle], 100).is_err());
 
     session(&conn, busy, 30, None);
-    assert!(library::merge_games(&conn, keep, &[idle, busy]).is_err());
+    assert!(library::merge_games(&conn, keep, &[idle, busy], 100).is_err());
     // The survivor's own active session blocks too.
-    assert!(library::merge_games(&conn, busy, &[idle]).is_err());
+    assert!(library::merge_games(&conn, busy, &[idle], 100).is_err());
 
     assert!(repo::get_game(&conn, idle).is_ok());
     assert_eq!(
@@ -217,5 +217,28 @@ fn merge_rejects_bad_input_and_changes_nothing() {
             keep
         ),
         0
+    );
+}
+
+#[test]
+fn merging_launcher_games_tombstones_them_but_not_manual_ones() {
+    let conn = test_db();
+    let keep = repo::insert_game(&conn, "Keep", GameSource::Manual, None, None, 1).unwrap();
+    let steam =
+        repo::insert_game(&conn, "Portal", GameSource::Steam, Some("400"), None, 1).unwrap();
+    let manual = repo::insert_game(&conn, "Hand", GameSource::Manual, None, None, 1).unwrap();
+
+    library::merge_games(&conn, keep.id, &[steam.id, manual.id], 700).unwrap();
+
+    let ignored = repo::list_ignored_imports(&conn).unwrap();
+    assert_eq!(ignored.len(), 1);
+    assert_eq!(
+        (
+            ignored[0].source,
+            ignored[0].source_id.as_str(),
+            ignored[0].name.as_str(),
+            ignored[0].ignored_at
+        ),
+        (GameSource::Steam, "400", "Portal", 700)
     );
 }

@@ -42,7 +42,7 @@ fn merging_deletes_the_limits_of_merged_games_only() {
         .unwrap();
     }
 
-    library::merge_games(&conn, keep, &[gone]).unwrap();
+    library::merge_games(&conn, keep, &[gone], 100).unwrap();
 
     let remaining = limits::list_statuses(&conn, 10_000).unwrap();
     let games: Vec<Option<i32>> = remaining.iter().map(|s| s.limit.game_id).collect();

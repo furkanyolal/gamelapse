@@ -73,7 +73,8 @@ fn load_spans(
 ) -> AppResult<Vec<Span>> {
     let mut stmt = conn.prepare(
         "SELECT started_at, COALESCE(ended_at, ?1), afk_secs FROM sessions
-         WHERE started_at < ?3 AND COALESCE(ended_at, ?1) > ?2 AND (?4 IS NULL OR game_id = ?4)",
+         WHERE started_at < ?3 AND COALESCE(ended_at, ?1) > ?2 AND (?4 IS NULL OR game_id = ?4)
+           AND (?4 IS NOT NULL OR game_id IN (SELECT id FROM games WHERE hidden = 0))",
     )?;
     let rows = stmt.query_map(params![now, from, to, game_id], |r| {
         Ok(Span {
@@ -85,7 +86,8 @@ fn load_spans(
     Ok(rows.collect::<Result<_, _>>()?)
 }
 
-/// Counted seconds inside `[from, to)` across all sessions (or one game's).
+/// Counted seconds inside `[from, to)` across all non-hidden games' sessions, or one game's
+/// (hidden or not).
 pub fn range_secs(
     conn: &Connection,
     from: i64,
@@ -194,7 +196,7 @@ pub fn game_totals(
          LEFT JOIN (
              SELECT game_id, SUM(minutes) AS minutes FROM imported_playtime GROUP BY game_id
          ) b ON b.game_id = g.id
-         WHERE grand > 0
+         WHERE g.hidden = 0 AND grand > 0
          ORDER BY grand DESC, g.sort_name
          LIMIT ?4",
     )?;
@@ -212,19 +214,21 @@ pub fn dashboard(conn: &Connection, now: i64) -> AppResult<DashboardStats> {
     let (week_start, today_start, tomorrow) = today_bounds(now);
     let tracked_secs: i64 = conn.query_row(
         "SELECT COALESCE(SUM(MAX(0, COALESCE(ended_at, ?1) - started_at - afk_secs)), 0)
-         FROM sessions",
+         FROM sessions WHERE game_id IN (SELECT id FROM games WHERE hidden = 0)",
         [now],
         |r| r.get(0),
     )?;
     let baseline_minutes: i64 = conn.query_row(
-        "SELECT COALESCE(SUM(minutes), 0) FROM imported_playtime",
+        "SELECT COALESCE(SUM(minutes), 0) FROM imported_playtime
+         WHERE game_id IN (SELECT id FROM games WHERE hidden = 0)",
         [],
         |r| r.get(0),
     )?;
     let games_played_count: i32 = conn.query_row(
         "SELECT COUNT(*) FROM games
-         WHERE id IN (SELECT game_id FROM sessions)
-            OR id IN (SELECT game_id FROM imported_playtime WHERE minutes > 0)",
+         WHERE hidden = 0
+           AND (id IN (SELECT game_id FROM sessions)
+                OR id IN (SELECT game_id FROM imported_playtime WHERE minutes > 0))",
         [],
         |r| r.get(0),
     )?;
@@ -243,6 +247,7 @@ pub fn dashboard(conn: &Connection, now: i64) -> AppResult<DashboardStats> {
                 to: None,
                 limit: 10,
                 offset: 0,
+                include_hidden: false,
             },
             now,
         )?,

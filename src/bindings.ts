@@ -88,6 +88,8 @@ export type ActiveSession = {
 	afkSecs: number,
 	isAfk: boolean,
 	source: ActiveSource,
+	/**  The game is hidden: tracked, but left out of default views. */
+	hidden: boolean,
 };
 
 /**  The source of an [`ActiveSession`]; the contract restricts it to `auto` or `manual`. */
@@ -458,6 +460,8 @@ export type SessionQuery_Deserialize = {
 	to?: number | null,
 	limit: number,
 	offset: number,
+	/**  Include sessions of hidden games (default false). */
+	includeHidden?: boolean,
 };
 
 export type SessionQuery_Serialize = {
@@ -466,6 +470,8 @@ export type SessionQuery_Serialize = {
 	to: number | null,
 	limit: number,
 	offset: number,
+	/**  Include sessions of hidden games (default false). */
+	includeHidden: boolean,
 };
 
 export type SessionSource = "auto" | "manual" | "imported";

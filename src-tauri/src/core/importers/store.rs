@@ -4,8 +4,9 @@ use std::collections::HashMap;
 
 use rusqlite::{Connection, OptionalExtension, params};
 
+use super::steam::is_known_tool;
 use crate::core::db::repo::{self, normalize_path};
-use crate::core::types::{DiscoveredGame, ImportResult, ImportSource, MatchMode};
+use crate::core::types::{DiscoveredGame, GameSource, ImportResult, ImportSource, MatchMode};
 use crate::error::AppResult;
 
 /// Adds an executable rule unless the game already has it. True when a row was added.
@@ -111,6 +112,10 @@ pub fn import_games(
                     found.install_dir.as_deref(),
                     now,
                 )?;
+                // Only new rows: an existing row keeps whatever the user chose.
+                if game_source == GameSource::Steam && is_known_tool(&found.source_id) {
+                    tx.execute("UPDATE games SET hidden = 1 WHERE id = ?1", [game.id])?;
+                }
                 (game.id, false, true)
             }
             Some((id, install_dir, cover_path)) => {

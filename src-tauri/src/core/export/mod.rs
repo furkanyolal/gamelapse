@@ -82,6 +82,8 @@ fn load_sessions(
         to: options.to,
         limit: u32::MAX,
         offset: 0,
+        // An export is the user's own data; hidden games stay in it.
+        include_hidden: true,
     };
     let mut sessions = repo::list_sessions(conn, &query, now)?;
     sessions.reverse();

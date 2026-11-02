@@ -175,11 +175,19 @@ impl LimitMonitor {
         if counting.is_empty() {
             return Ok(Vec::new());
         }
+        let mut counting_visible = false;
+        for id in counting {
+            if !repo::get_game(conn, *id)?.hidden {
+                counting_visible = true;
+                break;
+            }
+        }
         let mut due = Vec::new();
         for limit in limits {
             let counted = match limit.game_id {
                 Some(id) => counting.contains(&id),
-                None => true,
+                // A global limit is only judged while a non-hidden game is counting.
+                None => counting_visible,
             };
             if !counted {
                 continue;

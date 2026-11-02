@@ -184,6 +184,7 @@ impl Tracker {
             afk_secs: session.afk_secs,
             is_afk: entry.afk,
             source: entry.source,
+            hidden: game.hidden,
         })
     }
 
@@ -489,7 +490,11 @@ impl Tracker {
         let mut reminders = Vec::new();
         for game_id in self.sorted_game_ids() {
             let view = self.active_view(conn, game_id, now)?;
-            reminders.extend(self.check_reminder(&view, settings.reminder_interval_secs));
+            let reminder = self.check_reminder(&view, settings.reminder_interval_secs);
+            // The reminder state still advances for hidden games; only the emit is skipped.
+            if !view.hidden {
+                reminders.extend(reminder);
+            }
             events.push(TrackerEvent::Updated(view));
         }
         events.extend(reminders.into_iter().map(TrackerEvent::Reminder));

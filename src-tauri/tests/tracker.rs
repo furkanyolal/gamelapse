@@ -27,6 +27,7 @@ fn all_sessions(conn: &rusqlite::Connection) -> Vec<gamelapse_lib::core::types::
             to: None,
             limit: 100,
             offset: 0,
+            include_hidden: false,
         },
         1_000_000,
     )

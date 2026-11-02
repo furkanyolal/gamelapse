@@ -160,6 +160,8 @@ pub struct ActiveSession {
     pub afk_secs: i64,
     pub is_afk: bool,
     pub source: ActiveSource,
+    /// The game is hidden: tracked, but left out of default views.
+    pub hidden: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]
@@ -314,6 +316,9 @@ pub struct SessionQuery {
     pub to: Option<i64>,
     pub limit: u32,
     pub offset: u32,
+    /// Include sessions of hidden games (default false).
+    #[serde(default)]
+    pub include_hidden: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]

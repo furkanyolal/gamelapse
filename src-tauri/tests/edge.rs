@@ -56,6 +56,7 @@ fn query(game_id: Option<i32>, limit: u32, offset: u32) -> SessionQuery {
         to: None,
         limit: limit as _,
         offset: offset as _,
+        include_hidden: false,
     }
 }
 

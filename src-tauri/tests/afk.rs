@@ -197,6 +197,7 @@ fn duration_and_stats_exclude_afk_for_active_and_ended_sessions() {
             to: None,
             limit: 10,
             offset: 0,
+            include_hidden: false,
         },
         now,
     )

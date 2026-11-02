@@ -372,11 +372,19 @@ pub fn list_sessions(
          WHERE (?1 IS NULL OR s.game_id = ?1)
            AND (?2 IS NULL OR s.started_at >= ?2)
            AND (?3 IS NULL OR s.started_at < ?3)
+           AND (?6 OR g.hidden = 0)
          ORDER BY s.started_at DESC, s.id DESC
          LIMIT ?4 OFFSET ?5"
     ))?;
     let rows = stmt.query_map(
-        params![q.game_id, q.from, q.to, q.limit.max(1), q.offset],
+        params![
+            q.game_id,
+            q.from,
+            q.to,
+            q.limit.max(1),
+            q.offset,
+            q.include_hidden
+        ],
         |r| {
             Ok(SessionWithGame {
                 session: map_session(r, now)?,

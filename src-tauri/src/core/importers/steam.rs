@@ -13,6 +13,25 @@ use crate::error::{AppError, AppResult};
 const REDISTRIBUTABLES_APPID: &str = "228980";
 const HKLM_STEAM_KEY: &str = r"SOFTWARE\WOW6432Node\Valve\Steam";
 
+/// Steam apps that are tools, not games. They are marked hidden on first import (and by
+/// migration 4 for rows imported earlier); the user can unhide them and that sticks.
+/// This is the single source for both; migration 4's SQL is generated from it.
+pub const KNOWN_TOOLS: &[(u32, &str)] = &[
+    (431960, "Wallpaper Engine"),
+    (993090, "Lossless Scaling"),
+    (250820, "SteamVR"),
+    (365670, "Blender"),
+    (431730, "Aseprite"),
+    (480, "Spacewar (Steamworks SDK test app)"),
+];
+
+/// True when this Steam app id is in [`KNOWN_TOOLS`].
+pub fn is_known_tool(app_id: &str) -> bool {
+    app_id
+        .parse::<u32>()
+        .is_ok_and(|id| KNOWN_TOOLS.iter().any(|(tool, _)| *tool == id))
+}
+
 pub struct SteamImporter {
     registry: Box<dyn Registry>,
 }

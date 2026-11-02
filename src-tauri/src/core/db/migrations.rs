@@ -1,8 +1,12 @@
 //! Schema migrations, tracked through SQLite's `user_version`.
 //! All timestamps are UTC unix seconds stored as INTEGER.
 
+use std::sync::OnceLock;
+
 use rusqlite::Connection;
 use rusqlite_migration::{M, Migrations};
+
+use crate::core::importers::steam::KNOWN_TOOLS;
 
 const V1: &str = "
 CREATE TABLE games (
@@ -83,16 +87,32 @@ CREATE TABLE scan_roots (
 );
 ";
 
+/// Marks Steam rows imported before the "known tools" rule. Generated from `KNOWN_TOOLS`, so
+/// the list lives in one place; the SQL is frozen at what that list was for this release.
+fn v4() -> String {
+    let ids: Vec<String> = KNOWN_TOOLS
+        .iter()
+        .map(|(id, _)| format!("'{id}'"))
+        .collect();
+    format!(
+        "UPDATE games SET hidden = 1 WHERE source = 'steam' AND source_id IN ({});",
+        ids.join(", ")
+    )
+}
+
 /// The ordered list of migrations. Append only; never edit a released migration.
-const SCRIPTS: &[&str] = &[V1, V2, V3];
+fn scripts() -> &'static [String] {
+    static SCRIPTS: OnceLock<Vec<String>> = OnceLock::new();
+    SCRIPTS.get_or_init(|| vec![V1.into(), V2.into(), V3.into(), v4()])
+}
 
 pub fn migrations() -> Migrations<'static> {
-    Migrations::new(SCRIPTS.iter().map(|sql| M::up(sql)).collect())
+    Migrations::new(scripts().iter().map(|sql| M::up(sql)).collect())
 }
 
 /// Number of migrations, i.e. the expected `user_version` of an up-to-date database.
 pub fn count() -> usize {
-    SCRIPTS.len()
+    scripts().len()
 }
 
 pub fn run(conn: &mut Connection) -> Result<(), rusqlite_migration::Error> {

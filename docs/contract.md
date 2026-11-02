@@ -551,6 +551,44 @@ export interface UpdateProgress {
 - Toast on `update-available` linking to Settings.
 - Query keys: `["autostart"]`, `["update", "check"]`. `set_autostart` invalidates `["autostart"]`; `check_for_update` results are cached until the next explicit check.
 
+## Hidden games (decided 2026-11-02)
+
+A hidden game is still tracked and keeps its sessions, but stays out of everything shown by default:
+
+- `list_games(includeHidden = false)` omits it (unchanged).
+- `SessionQuery` gains `includeHidden: boolean` (serde default `false`); `list_sessions` omits sessions of hidden games unless set.
+- `get_dashboard_stats`, `get_daily_totals`, `get_hourly_totals` and `get_game_totals` exclude hidden games entirely (totals, top games, recent sessions, games played count).
+- Global limits count only non-hidden games; per-game limits on a hidden game still work. Reminders skip hidden games.
+- `ActiveSession` gains `hidden: boolean`. The tracker still runs and emits for hidden games; the now-playing strip, the sidebar indicator and the "Limits today" card skip entries with `hidden = true`.
+- The game's own detail page shows everything, with a badge "Hidden: tracked, but left out of lists and totals".
+- The Steam importer sets `hidden = true` on first import for a short built-in list of non-game apps (at least Wallpaper Engine 431960, Lossless Scaling 993090, SteamVR 250820, Blender 365670, Aseprite 431730). User edits to `hidden` are preserved on re-import. Migration 4 applies the same marking once to rows imported before this rule.
+- Sessions page: a "Show hidden games" switch drives `includeHidden`.
+
+## Ignored imports (decided 2026-11-02)
+
+Deleting a game that came from a launcher must stick; the next import must not bring it back.
+
+- Migration 5: `ignored_imports (source TEXT NOT NULL, source_id TEXT NOT NULL, name TEXT NOT NULL, ignored_at INTEGER NOT NULL, PRIMARY KEY (source, source_id))`.
+- `delete_game` on a game with a non-null `sourceId` writes a row with the game's name. Manual games added by hand or by folder scan have no `sourceId` and are unaffected.
+- Every import path (`import_games`, the startup import, `fetch_steam_playtime`) skips `(source, sourceId)` pairs present in `ignored_imports`. Heroic and the official importers share ids, so one row covers both.
+- `DiscoveredGame` gains `ignored: boolean`; `scan_import_source` still lists ignored games so the dialog can show them.
+
+```ts
+export interface IgnoredImport {
+  source: GameSource;
+  sourceId: string;
+  name: string;
+  ignoredAt: number;
+}
+```
+
+| Command                  | Arguments                              | Returns           | Notes                                                                                               |
+| ------------------------ | -------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------- |
+| `list_ignored_imports`   |                                        | `IgnoredImport[]` | Newest first.                                                                                       |
+| `restore_ignored_import` | `source: GameSource, sourceId: string` | `null`            | Removes the row. The caller re-runs `import_games` to bring the game back. Emits `library-changed`. |
+
+Frontend: in the import dialog, rows with `ignored` show an "Ignored" badge and a "Restore" button that calls `restore_ignored_import` and then `import_games` for that source. The delete confirmation for an imported game says it will not be re-imported and can be restored from the Import dialog. Query key `["import", "ignored"]`, invalidated by `library-changed`.
+
 ## Phase 7: Heroic import, folder scan, metadata lookup
 
 Additions to the contract above, same conventions. Principle: Gamelapse never scans or watches folders on its own. A scan runs only when the user clicks Scan, and nothing enters the library until the user confirms it.

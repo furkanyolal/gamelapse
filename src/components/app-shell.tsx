@@ -5,10 +5,13 @@ import {
   LayoutDashboard,
   Settings,
 } from "lucide-react";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
+import { Elapsed } from "@/components/now-playing";
+import { ThemeSync } from "@/components/theme-sync";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -18,6 +21,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+import { useApiEvents } from "@/hooks/use-api-events";
+import { useTrackerStatus } from "@/hooks/use-tracker";
 
 const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -28,12 +33,16 @@ const NAV_ITEMS = [
 ];
 
 export function AppShell() {
+  useApiEvents();
+  const { data: status } = useTrackerStatus();
+  const playing = status?.active[0];
   const { pathname } = useLocation();
   const isActive = (to: string) =>
     to === "/" ? pathname === "/" : pathname.startsWith(to);
 
   return (
     <SidebarProvider>
+      <ThemeSync />
       <Sidebar collapsible="none" className="border-r">
         <SidebarHeader className="px-4 py-4 text-base font-semibold">
           GameTimeTracker
@@ -56,6 +65,21 @@ export function AppShell() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter>
+          {playing && (
+            <Link
+              to={`/games/${playing.gameId}`}
+              className="bg-sidebar-accent flex items-center gap-2 rounded-md px-3 py-2 text-xs"
+              aria-label="Now playing"
+            >
+              <span className="size-2 shrink-0 rounded-full bg-emerald-500" />
+              <span className="min-w-0 flex-1 truncate">
+                {playing.gameName}
+              </span>
+              <Elapsed session={playing} />
+            </Link>
+          )}
+        </SidebarFooter>
       </Sidebar>
       <SidebarInset>
         <main className="p-6">

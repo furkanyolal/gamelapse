@@ -178,47 +178,47 @@ export interface SessionQuery {
 
 ## Commands
 
-| Command | Arguments | Returns | Notes |
-|---|---|---|---|
-| `get_app_info` | | `AppInfo` | exists |
-| `ping` | | `string` | exists |
-| `get_tracker_status` | | `TrackerStatus` | |
-| `set_tracking_enabled` | `enabled: boolean` | `TrackerStatus` | Also persists `trackingEnabled` in settings. Disabling stops polling; active auto sessions end immediately. Manual sessions keep running. |
-| `start_manual_session` | `gameId: number` | `ActiveSession` | Error if that game already has an active session. |
-| `stop_session` | `sessionId: number` | `Session` | Ends an active session now. Error if not active. |
-| `list_games` | `includeHidden: boolean` | `GameSummary[]` | Sorted by `sortName`. |
-| `get_game` | `gameId: number` | `GameSummary` | |
-| `add_game_from_exe` | `exePath: string, name: string \| null` | `Game` | Source `manual`, `installDir` = parent directory, one `exact_path` executable. Name defaults to the file stem. Error if the exe is already attached to a game. |
-| `update_game` | `gameId: number, patch: GameUpdate` | `Game` | `sortName` is recomputed from `name` (lowercase, leading "the " dropped). |
-| `delete_game` | `gameId: number` | `null` | Cascades to executables and sessions. Error if the game has an active session. |
-| `list_game_executables` | `gameId: number` | `GameExecutable[]` | |
-| `add_game_executable` | `gameId: number, exePath: string, matchMode: MatchMode` | `GameExecutable` | Path normalised by the backend. |
-| `remove_game_executable` | `executableId: number` | `null` | |
-| `pick_executable` | | `string \| null` | Native file dialog filtered to `*.exe`; `null` when cancelled. Uses tauri-plugin-dialog on the Rust side. |
-| `list_sessions` | `query: SessionQuery` | `SessionWithGame[]` | Newest first. Active sessions included with `endedAt: null`. |
-| `create_session` | `gameId: number, startedAt: number, endedAt: number, note: string \| null` | `Session` | Source `manual`. Error unless `endedAt > startedAt`. |
-| `update_session` | `sessionId: number, patch: SessionUpdate` | `Session` | Recomputes `durationSecs`. Error if the session is active, or if the result would have `endedAt <= startedAt`. |
-| `delete_session` | `sessionId: number` | `null` | Error if the session is active. |
-| `get_dashboard_stats` | | `DashboardStats` | |
-| `get_daily_totals` | `days: number, gameId: number \| null` | `DailyTotal[]` | Today and the previous `days - 1` days. |
-| `get_game_totals` | `from: number \| null, to: number \| null, limit: number` | `GameTotal[]` | Descending by `totalSecs`, bounds on `startedAt`. |
-| `get_hourly_totals` | `days: number` | `HourlyTotal[]` | |
-| `get_settings` | | `Settings` | |
-| `update_settings` | `patch: SettingsUpdate` | `Settings` | Tracker reads new values on its next poll. Validation errors for out-of-range values. |
-| `seed_demo_data` | | `null` | Inserts a deterministic demo dataset: 8 games with `source = "manual"` and `sourceId = "demo-1"` to `"demo-8"`, about 120 sessions spread over the last 60 days with varied hours and lengths from 10 minutes to 5 hours. No-op if the demo games already exist (any game with `sourceId` `"demo-1"` to `"demo-8"`). Emits `library-changed` and `sessions-changed` when it inserts.
+| Command                  | Arguments                                                                  | Returns             | Notes                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------ | -------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `get_app_info`           |                                                                            | `AppInfo`           | exists                                                                                                                                                                                                                                                                                                                                                                               |
+| `ping`                   |                                                                            | `string`            | exists                                                                                                                                                                                                                                                                                                                                                                               |
+| `get_tracker_status`     |                                                                            | `TrackerStatus`     |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `set_tracking_enabled`   | `enabled: boolean`                                                         | `TrackerStatus`     | Also persists `trackingEnabled` in settings. Disabling stops polling; active auto sessions end immediately. Manual sessions keep running.                                                                                                                                                                                                                                            |
+| `start_manual_session`   | `gameId: number`                                                           | `ActiveSession`     | Error if that game already has an active session.                                                                                                                                                                                                                                                                                                                                    |
+| `stop_session`           | `sessionId: number`                                                        | `Session`           | Ends an active session now. Error if not active.                                                                                                                                                                                                                                                                                                                                     |
+| `list_games`             | `includeHidden: boolean`                                                   | `GameSummary[]`     | Sorted by `sortName`.                                                                                                                                                                                                                                                                                                                                                                |
+| `get_game`               | `gameId: number`                                                           | `GameSummary`       |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `add_game_from_exe`      | `exePath: string, name: string \| null`                                    | `Game`              | Source `manual`, `installDir` = parent directory, one `exact_path` executable. Name defaults to the file stem. Error if the exe is already attached to a game.                                                                                                                                                                                                                       |
+| `update_game`            | `gameId: number, patch: GameUpdate`                                        | `Game`              | `sortName` is recomputed from `name` (lowercase, leading "the " dropped).                                                                                                                                                                                                                                                                                                            |
+| `delete_game`            | `gameId: number`                                                           | `null`              | Cascades to executables and sessions. Error if the game has an active session.                                                                                                                                                                                                                                                                                                       |
+| `list_game_executables`  | `gameId: number`                                                           | `GameExecutable[]`  |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `add_game_executable`    | `gameId: number, exePath: string, matchMode: MatchMode`                    | `GameExecutable`    | Path normalised by the backend.                                                                                                                                                                                                                                                                                                                                                      |
+| `remove_game_executable` | `executableId: number`                                                     | `null`              |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `pick_executable`        |                                                                            | `string \| null`    | Native file dialog filtered to `*.exe`; `null` when cancelled. Uses tauri-plugin-dialog on the Rust side.                                                                                                                                                                                                                                                                            |
+| `list_sessions`          | `query: SessionQuery`                                                      | `SessionWithGame[]` | Newest first. Active sessions included with `endedAt: null`.                                                                                                                                                                                                                                                                                                                         |
+| `create_session`         | `gameId: number, startedAt: number, endedAt: number, note: string \| null` | `Session`           | Source `manual`. Error unless `endedAt > startedAt`.                                                                                                                                                                                                                                                                                                                                 |
+| `update_session`         | `sessionId: number, patch: SessionUpdate`                                  | `Session`           | Recomputes `durationSecs`. Error if the session is active, or if the result would have `endedAt <= startedAt`.                                                                                                                                                                                                                                                                       |
+| `delete_session`         | `sessionId: number`                                                        | `null`              | Error if the session is active.                                                                                                                                                                                                                                                                                                                                                      |
+| `get_dashboard_stats`    |                                                                            | `DashboardStats`    |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `get_daily_totals`       | `days: number, gameId: number \| null`                                     | `DailyTotal[]`      | Today and the previous `days - 1` days.                                                                                                                                                                                                                                                                                                                                              |
+| `get_game_totals`        | `from: number \| null, to: number \| null, limit: number`                  | `GameTotal[]`       | Descending by `totalSecs`, bounds on `startedAt`.                                                                                                                                                                                                                                                                                                                                    |
+| `get_hourly_totals`      | `days: number`                                                             | `HourlyTotal[]`     |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `get_settings`           |                                                                            | `Settings`          |                                                                                                                                                                                                                                                                                                                                                                                      |
+| `update_settings`        | `patch: SettingsUpdate`                                                    | `Settings`          | Tracker reads new values on its next poll. Validation errors for out-of-range values.                                                                                                                                                                                                                                                                                                |
+| `seed_demo_data`         |                                                                            | `null`              | Inserts a deterministic demo dataset: 8 games with `source = "manual"` and `sourceId = "demo-1"` to `"demo-8"`, about 120 sessions spread over the last 60 days with varied hours and lengths from 10 minutes to 5 hours. No-op if the demo games already exist (any game with `sourceId` `"demo-1"` to `"demo-8"`). Emits `library-changed` and `sessions-changed` when it inserts. |
 
 ## Events
 
 Names are kebab-case. Rust emits them with `app.emit(name, payload)`; the payload serialises like every other type (camelCase).
 
-| Event | Payload | Emitted when |
-|---|---|---|
-| `session-started` | `ActiveSession` | A session opens (auto match, reopen after a merge, or `start_manual_session`). |
-| `session-updated` | `ActiveSession` | Every poll, once per active session. Carries fresh `elapsedSecs`. |
-| `session-ended` | `Session` | A session closes (missed polls, `stop_session`, tracking disabled). |
-| `tracker-status-changed` | `TrackerStatus` | Tracking is enabled or disabled, or the set of active sessions changes. |
-| `library-changed` | `null` | Games or executables are added, edited or deleted (`add_game_from_exe`, `update_game`, `delete_game`, `add_game_executable`, `remove_game_executable`, `seed_demo_data`). |
-| `sessions-changed` | `null` | Sessions are created, edited or deleted through commands (`create_session`, `update_session`, `delete_session`, `seed_demo_data`). Not emitted for tracker-driven changes; those use the session events. |
+| Event                    | Payload         | Emitted when                                                                                                                                                                                             |
+| ------------------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session-started`        | `ActiveSession` | A session opens (auto match, reopen after a merge, or `start_manual_session`).                                                                                                                           |
+| `session-updated`        | `ActiveSession` | Every poll, once per active session. Carries fresh `elapsedSecs`.                                                                                                                                        |
+| `session-ended`          | `Session`       | A session closes (missed polls, `stop_session`, tracking disabled).                                                                                                                                      |
+| `tracker-status-changed` | `TrackerStatus` | Tracking is enabled or disabled, or the set of active sessions changes.                                                                                                                                  |
+| `library-changed`        | `null`          | Games or executables are added, edited or deleted (`add_game_from_exe`, `update_game`, `delete_game`, `add_game_executable`, `remove_game_executable`, `seed_demo_data`).                                |
+| `sessions-changed`       | `null`          | Sessions are created, edited or deleted through commands (`create_session`, `update_session`, `delete_session`, `seed_demo_data`). Not emitted for tracker-driven changes; those use the session events. |
 
 ## Tracker behaviour
 
@@ -252,22 +252,22 @@ Rules the Rust tracker follows. Logic lives in `core/tracker/` with no Tauri typ
 
 Hooks in `src/hooks/` use TanStack Query with these keys; arguments go last.
 
-| Family | Key |
-|---|---|
-| Tracker | `["tracker", "status"]` |
-| Games | `["games", "list", { includeHidden }]`, `["games", "detail", gameId]`, `["games", "executables", gameId]` |
-| Sessions | `["sessions", "list", query]` |
-| Stats | `["stats", "dashboard"]`, `["stats", "daily", days, gameId]`, `["stats", "games", from, to, limit]`, `["stats", "hourly", days]` |
-| Settings | `["settings"]`, app info `["app", "info"]` |
+| Family   | Key                                                                                                                              |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Tracker  | `["tracker", "status"]`                                                                                                          |
+| Games    | `["games", "list", { includeHidden }]`, `["games", "detail", gameId]`, `["games", "executables", gameId]`                        |
+| Sessions | `["sessions", "list", query]`                                                                                                    |
+| Stats    | `["stats", "dashboard"]`, `["stats", "daily", days, gameId]`, `["stats", "games", from, to, limit]`, `["stats", "hourly", days]` |
+| Settings | `["settings"]`, app info `["app", "info"]`                                                                                       |
 
 ### Invalidation
 
-| Event | Invalidates |
-|---|---|
-| `session-started`, `session-ended` | `["tracker"]`, `["games"]`, `["sessions"]`, `["stats"]` |
-| `session-updated` | Writes the payload into `["tracker", "status"]` with `setQueryData`; no refetch. |
-| `tracker-status-changed` | `["tracker"]`, `["settings"]` |
-| `library-changed` | `["games"]`, `["sessions"]`, `["stats"]` |
-| `sessions-changed` | `["sessions"]`, `["games"]`, `["stats"]` |
+| Event                              | Invalidates                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------------- |
+| `session-started`, `session-ended` | `["tracker"]`, `["games"]`, `["sessions"]`, `["stats"]`                          |
+| `session-updated`                  | Writes the payload into `["tracker", "status"]` with `setQueryData`; no refetch. |
+| `tracker-status-changed`           | `["tracker"]`, `["settings"]`                                                    |
+| `library-changed`                  | `["games"]`, `["sessions"]`, `["stats"]`                                         |
+| `sessions-changed`                 | `["sessions"]`, `["games"]`, `["stats"]`                                         |
 
 Mutations also invalidate their own family on success, so the UI stays correct if an event is missed.

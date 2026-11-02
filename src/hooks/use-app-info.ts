@@ -1,21 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { commands, type AppInfo } from "@/bindings";
-
-export const appInfoQueryKey = ["app-info"] as const;
-
-async function fetchAppInfo(): Promise<AppInfo> {
-  const result = await commands.getAppInfo();
-  if (result.status === "error") {
-    throw new Error(result.error);
-  }
-  return result.data;
-}
+import { api } from "@/api";
+import { keys } from "@/hooks/query-keys";
 
 /** App version and on-disk locations, from the `get_app_info` command. */
 export function useAppInfo() {
   return useQuery({
-    queryKey: appInfoQueryKey,
-    queryFn: fetchAppInfo,
+    queryKey: keys.appInfo,
+    queryFn: () => api.getAppInfo(),
     staleTime: Infinity,
   });
 }

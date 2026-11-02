@@ -36,6 +36,11 @@ specta = { version = "=2.0.0-rc.26", features = ["derive"] }
 specta-typescript = "0.0.13"
 tauri-specta = { version = "=2.0.0-rc.26", features = ["derive", "typescript"] }
 
+# Debug info is off in dev builds to keep `target/` small (full debug info needs several GB on Windows).
+# Switch to `debug = "line-tables-only"` once disk space allows, for line numbers in backtraces.
+[profile.dev]
+debug = 0
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

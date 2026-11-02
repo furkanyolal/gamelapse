@@ -20,3 +20,6 @@ desktop.ini
 .idea
 .vscode/*
 !.vscode/extensions.json
+
+# Local cargo config (machine-specific target-dir)
+/.cargo/

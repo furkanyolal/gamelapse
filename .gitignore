@@ -26,3 +26,6 @@ desktop.ini
 
 # OpenChamber screenshots
 /.openchamber/
+
+# TypeScript incremental build info
+*.tsbuildinfo

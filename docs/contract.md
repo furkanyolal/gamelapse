@@ -351,3 +351,82 @@ export interface SteamApiSettings {
 - Games page: an "Import" button opening the same dialog. Rows and detail show the cover when `coverPath` is set, via `convertFileSrc` from `@tauri-apps/api/core` in the Tauri client and a plain URL in the mock.
 - Game detail: an "Imported playtime" line when `importedMinutes > 0`.
 - Query keys: `["import", "sources"]`, `["import", "scan", source]`, `["steamApi", "settings"]`. `import_games` and `fetch_steam_playtime` invalidate `["games"]`, `["stats"]` and `["import"]`.
+
+## Phase 4: AFK detection, limits and reminders
+
+Additions to the contract above, same conventions.
+
+### Types
+
+```ts
+export type LimitScope = "global" | "game";
+/** notify: once per day when reached. notify_repeat: again every 15 minutes while still playing past it. */
+export type LimitAction = "notify" | "notify_repeat";
+
+export interface Limit {
+  id: number;
+  scope: LimitScope;
+  /** null for global */
+  gameId: number | null;
+  gameName: string | null;
+  dailySecs: number;
+  action: LimitAction;
+}
+
+export interface LimitInput {
+  scope: LimitScope;
+  gameId: number | null;
+  dailySecs: number;
+  action: LimitAction;
+}
+
+export interface LimitStatus {
+  limit: Limit;
+  /** Today's play counted against this limit, active sessions included, AFK excluded */
+  usedTodaySecs: number;
+  /** max(0, dailySecs - usedTodaySecs) */
+  remainingSecs: number;
+  reached: boolean;
+}
+
+export interface Reminder {
+  sessionId: number;
+  gameId: number;
+  gameName: string;
+  elapsedSecs: number;
+}
+```
+
+`Settings` and `SettingsUpdate` gain `notificationsEnabled: boolean` (default `true`) and `reminderIntervalSecs: number` (default `0`, meaning off; otherwise 300 to 14400).
+
+### Commands
+
+| Command        | Arguments                            | Returns         | Notes                                                                    |
+| -------------- | ------------------------------------ | --------------- | ------------------------------------------------------------------------ |
+| `list_limits`  |                                      | `LimitStatus[]` | Global first, then games by name.                                        |
+| `create_limit` | `input: LimitInput`                  | `Limit`         | One global limit at most, one per game at most; `dailySecs` 60 to 86400. |
+| `update_limit` | `limitId: number, input: LimitInput` | `Limit`         |                                                                          |
+| `delete_limit` | `limitId: number`                    | `null`          |                                                                          |
+
+### Events
+
+| Event           | Payload       | Emitted when                                                                                                                |
+| --------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `limit-reached` | `LimitStatus` | A poll finds a limit newly reached today, and again every 15 minutes for `notify_repeat` while a counted session is active. |
+| `reminder`      | `Reminder`    | A session's non-AFK elapsed time crosses each multiple of `reminderIntervalSecs`.                                           |
+
+`session-updated` already carries `isAfk` and `afkSecs`; there is no separate AFK event. Limits and reminders also produce an OS notification through tauri-plugin-notification when `notificationsEnabled` is on.
+
+### Idle rules
+
+- Idle time comes from `GetLastInputInfo` each poll while any session is active. Gamepads do not reset it, so XInput slots 0 to 3 are polled too and a packet-number change counts as input. A locked workstation (`OpenInputDesktop` fails) counts as idle.
+- A session becomes AFK when idle time exceeds `afkThresholdSecs`. AFK starts retroactively at the last input time, so the threshold minutes are not counted as play. It ends on the first poll with fresh input.
+- `afkSecs` accumulates per poll while AFK; `durationSecs` and `elapsedSecs` exclude it. Games with `afkDetectionEnabled = false` never go AFK. Manual sessions follow the same rules.
+- Limits count non-AFK time only. Day boundaries are local midnight, like the stats.
+
+### Frontend
+
+- Settings page: a "Limits" card listing each limit with a usage bar and remaining time, add, edit and delete through a dialog (scope, game, hours and minutes, action), plus the `notificationsEnabled` switch and a reminder interval select (off, 30 min, 1 h, 2 h, 3 h).
+- Dashboard: a compact "Limits today" list when any limit exists, bar per limit, red when reached. The now-playing strip shows an AFK badge and the elapsed timer pauses while AFK.
+- Toasts for `limit-reached` and `reminder` in the app, in addition to the OS notification.
+- Query keys: `["limits", "list"]`. `limit-reached`, `session-started` and `session-ended` invalidate `["limits"]`; mutations invalidate `["limits"]`.

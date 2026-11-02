@@ -274,3 +274,80 @@ Hooks in `src/hooks/` use TanStack Query with these keys; arguments go last.
 | `sessions-changed`                 | `["sessions"]`, `["games"]`, `["stats"]`                                         |
 
 Mutations also invalidate their own family on success, so the UI stays correct if an event is missed.
+
+## Phase 3: launcher imports
+
+Additions to the contract above, same conventions.
+
+### Types
+
+```ts
+export type ImportSource = "steam" | "epic" | "gog";
+
+export interface ImportSourceStatus {
+  source: ImportSource;
+  /** The launcher was found on this machine */
+  available: boolean;
+  /** Install path when available, otherwise why not */
+  detail: string | null;
+  lastScanAt: number | null;
+}
+
+export interface DiscoveredGame {
+  source: ImportSource;
+  sourceId: string;
+  name: string;
+  installDir: string | null;
+  /** Normalised exact executable paths known from the launcher; may be empty */
+  executables: string[];
+  /** Launcher-reported playtime, when the launcher tracks it */
+  playtimeMinutes: number | null;
+  /** A game with this source and sourceId already exists */
+  alreadyImported: boolean;
+}
+
+export interface ImportResult {
+  source: ImportSource;
+  discovered: number;
+  added: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export interface SteamApiSettings {
+  apiKey: string | null;
+  steamId64: string | null;
+}
+```
+
+`Settings` and `SettingsUpdate` gain `importOnStartup: boolean` (default `true`).
+
+### Commands
+
+| Command | Arguments | Returns | Notes |
+|---|---|---|---|
+| `list_import_sources` | | `ImportSourceStatus[]` | Always all three sources. |
+| `scan_import_source` | `source: ImportSource` | `DiscoveredGame[]` | Preview only, writes nothing. |
+| `import_games` | `source: ImportSource` | `ImportResult` | Scans and upserts. Emits `library-changed`. |
+| `get_steam_api_settings` | | `SteamApiSettings` | |
+| `set_steam_api_settings` | `settings: SteamApiSettings` | `null` | Stored locally in the settings store. |
+| `fetch_steam_playtime` | | `ImportResult` | Steam Web API `GetOwnedGames`; needs key, SteamID64 and a public game list. Updates `imported_playtime` for existing Steam games (`updated` counts them). Emits `library-changed`. |
+
+### Import rules
+
+- Upsert by `(source, sourceId)`. New games get `source`, `sourceId`, `name`, `sortName`, `installDir`. Existing games keep user-edited `name`, `hidden` and `afkDetectionEnabled`; only `installDir` and executables are refreshed.
+- Executables: one `install_dir_prefix` rule for `installDir` when it exists, plus one `exact_path` rule per discovered executable. User-added rules are never removed.
+- Launcher playtime goes to `imported_playtime (game_id, source)`, never to `sessions`.
+- Steam: install path from `HKCU\Software\Valve\Steam\SteamPath` only if it contains `steamapps\libraryfolders.vdf`, otherwise `HKLM\SOFTWARE\WOW6432Node\Valve\Steam\InstallPath`. Libraries from `libraryfolders.vdf`; games from `appmanifest_*.acf` (`appid`, `name`, `installdir`, `StateFlags`). Skip appid 228980 and manifests whose install directory does not exist. Cover art from `https://cdn.cloudflare.steamstatic.com/steam/apps/<appid>/header.jpg`, downloaded once to `<app data>/covers/steam/<appid>.jpg` and set as `coverPath`; download failures are not errors.
+- Epic: `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item` (fallback `AppDataPath` under `HKLM\SOFTWARE\WOW6432Node\Epic Games\EpicGamesLauncher`). Fields `DisplayName`, `InstallLocation`, `LaunchExecutable`, `AppName`, `MainGameAppName`, `bIsIncompleteInstall`. Skip incomplete installs and DLC (`AppName != MainGameAppName`). No playtime.
+- GOG: registry `HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\<id>` (`gameName`, `path`, `exe`) first. If `C:\ProgramData\GOG.com\Galaxy\storage\galaxy-2.0.db` exists, copy it to a temp file and read titles and `GameTimes.minutesInGame` read-only; a schema surprise becomes an error string and does not drop the registry games.
+- Startup: when `importOnStartup` is on, run `import_games` for every available source on a background thread after the tracker starts.
+- Tracker signal: while `steam.exe` is running, a non-zero `HKCU\Software\Valve\Steam\RunningAppID` matches the Steam game with that `sourceId`, even when its process path is unreadable.
+
+### Frontend
+
+- Settings page: an "Import" card listing the three sources with availability and last scan, a Scan button that previews discovered games in a dialog with an Import button, and result counts. A Steam Web API section with key and SteamID64 fields and a "Fetch playtime" button. The `importOnStartup` switch.
+- Games page: an "Import" button opening the same dialog. Rows and detail show the cover when `coverPath` is set, via `convertFileSrc` from `@tauri-apps/api/core` in the Tauri client and a plain URL in the mock.
+- Game detail: an "Imported playtime" line when `importedMinutes > 0`.
+- Query keys: `["import", "sources"]`, `["import", "scan", source]`, `["steamApi", "settings"]`. `import_games` and `fetch_steam_playtime` invalidate `["games"]`, `["stats"]` and `["import"]`.

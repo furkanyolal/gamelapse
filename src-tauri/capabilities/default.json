@@ -9,8 +9,10 @@
     {
       "identifier": "opener:allow-open-path",
       "allow": [
-        { "path": "$APPDATA/com.furkanyolal.gamelapse" },
-        { "path": "$APPDATA/com.furkanyolal.gamelapse/**" }
+        { "path": "$APPDATA" },
+        { "path": "$APPDATA/**" },
+        { "path": "$APPLOG" },
+        { "path": "$APPLOG/**" }
       ]
     },
     "notification:default",

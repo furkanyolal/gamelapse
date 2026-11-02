@@ -325,14 +325,14 @@ export interface SteamApiSettings {
 
 ### Commands
 
-| Command | Arguments | Returns | Notes |
-|---|---|---|---|
-| `list_import_sources` | | `ImportSourceStatus[]` | Always all three sources. |
-| `scan_import_source` | `source: ImportSource` | `DiscoveredGame[]` | Preview only, writes nothing. |
-| `import_games` | `source: ImportSource` | `ImportResult` | Scans and upserts. Emits `library-changed`. |
-| `get_steam_api_settings` | | `SteamApiSettings` | |
-| `set_steam_api_settings` | `settings: SteamApiSettings` | `null` | Stored locally in the settings store. |
-| `fetch_steam_playtime` | | `ImportResult` | Steam Web API `GetOwnedGames`; needs key, SteamID64 and a public game list. Updates `imported_playtime` for existing Steam games (`updated` counts them). Emits `library-changed`. |
+| Command                  | Arguments                    | Returns                | Notes                                                                                                                                                                              |
+| ------------------------ | ---------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_import_sources`    |                              | `ImportSourceStatus[]` | Always all three sources.                                                                                                                                                          |
+| `scan_import_source`     | `source: ImportSource`       | `DiscoveredGame[]`     | Preview only, writes nothing.                                                                                                                                                      |
+| `import_games`           | `source: ImportSource`       | `ImportResult`         | Scans and upserts. Emits `library-changed`.                                                                                                                                        |
+| `get_steam_api_settings` |                              | `SteamApiSettings`     |                                                                                                                                                                                    |
+| `set_steam_api_settings` | `settings: SteamApiSettings` | `null`                 | Stored locally in the settings store.                                                                                                                                              |
+| `fetch_steam_playtime`   |                              | `ImportResult`         | Steam Web API `GetOwnedGames`; needs key, SteamID64 and a public game list. Updates `imported_playtime` for existing Steam games (`updated` counts them). Emits `library-changed`. |
 
 ### Import rules
 

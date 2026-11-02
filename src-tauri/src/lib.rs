@@ -76,6 +76,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::data::export_data,
         commands::data::backup_database,
         commands::data::restore_database,
+        commands::autostart::get_autostart,
+        commands::autostart::set_autostart,
+        commands::updates::check_for_update,
+        commands::updates::install_update,
     ])
 }
 
@@ -158,6 +162,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -205,6 +215,7 @@ pub fn run() {
             setup_tray(app.handle())?;
             runtime::spawn_tracker(app.handle().clone());
             runtime::spawn_startup_import(app.handle().clone());
+            commands::updates::spawn_startup_update_check(app.handle().clone());
 
             let minimized = std::env::args().any(|a| a == "--minimized");
             if !minimized {

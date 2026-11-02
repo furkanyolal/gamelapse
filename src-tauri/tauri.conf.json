@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Gamelapse",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.furkanyolal.gamelapse",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -31,7 +31,22 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
+    "publisher": "Furkan YOLAL",
+    "copyright": "Copyright (c) 2026 Furkan YOLAL",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
+    "shortDescription": "Open source game time tracker for Windows",
+    "longDescription": "Gamelapse tracks how long you play, keeps your library and play history on your own PC, and can import games from Steam and other launchers.",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,5 +54,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwOEJFRjMyMDZBNTMxNTUKUldSVk1hVUdNdStMY0QvMkVEUDVxeGJseGtCUklDa3FnZ3VmR1hGWjg2R0RGWUtkdm85YU4rV04K",
+      "endpoints": [
+        "https://github.com/furkanyolal/gamelapse/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

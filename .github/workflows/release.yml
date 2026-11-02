@@ -1,0 +1,43 @@
+# Builds the signed Windows installer and publishes it as a draft GitHub release when a
+# `v*` tag is pushed. Review the draft, then publish it so the updater feed (latest.json) goes live.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   TAURI_SIGNING_PRIVATE_KEY           content of ~/.tauri/gamelapse.key, which signs the update
+#                                       artifacts. Keep a backup: losing it strands installed apps.
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  the key's password; the key has none, so it is set to "" below.
+#   GITHUB_TOKEN is provided by Actions automatically.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Gamelapse ${{ github.ref_name }}"
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: --bundles nsis

@@ -42,6 +42,7 @@ export type OutputChecks = [
   Assert<Mutual<B.ExportFormat, T.ExportFormat>>,
   Assert<Mutual<B.ExportResult, T.ExportResult>>,
   Assert<Mutual<B.BackupInfo, T.BackupInfo>>,
+  Assert<Mutual<B.UpdateInfo_Serialize, T.UpdateInfo>>,
 ];
 
 export type InputChecks = [

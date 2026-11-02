@@ -1,6 +1,7 @@
 //! Tauri commands exposed to the frontend, grouped by family.
 //! Lock order: tracker, then db (see `AppState`).
 
+pub mod autostart;
 pub mod data;
 pub mod dev;
 pub mod games;
@@ -11,6 +12,7 @@ pub mod sessions;
 pub mod settings;
 pub mod stats;
 pub mod tracker;
+pub mod updates;
 
 use tauri::State;
 

@@ -237,6 +237,8 @@ pub struct Settings {
     pub notifications_enabled: bool,
     /// 0 turns reminders off; otherwise 300 to 14400.
     pub reminder_interval_secs: u32,
+    /// True once the user answered the "start with Windows" hint on the dashboard.
+    pub startup_hint_dismissed: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Type)]
@@ -253,6 +255,28 @@ pub struct SettingsUpdate {
     pub import_on_startup: Option<bool>,
     pub notifications_enabled: Option<bool>,
     pub reminder_interval_secs: Option<u32>,
+    pub startup_hint_dismissed: Option<bool>,
+}
+
+/// Release found by the updater feed.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateInfo {
+    pub version: String,
+    pub current_version: String,
+    /// Release date as an ISO string, when the feed provides it.
+    pub date: Option<String>,
+    pub notes: Option<String>,
+}
+
+/// Payload of the `update-progress` event.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateProgress {
+    #[specta(type = specta_typescript::Number)]
+    pub downloaded: u64,
+    #[specta(type = Option<specta_typescript::Number>)]
+    pub total: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]

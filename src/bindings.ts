@@ -53,6 +53,19 @@ export const commands = {
 	exportData: (options: ExportOptions_Deserialize) => typedError<ExportResult | null, string>(__TAURI_INVOKE("export_data", { options })),
 	backupDatabase: () => typedError<BackupInfo | null, string>(__TAURI_INVOKE("backup_database")),
 	restoreDatabase: () => typedError<null, string>(__TAURI_INVOKE("restore_database")),
+	getAutostart: () => typedError<boolean, string>(__TAURI_INVOKE("get_autostart")),
+	/**
+	 *  Creates or removes the Windows autostart entry (launches with `--minimized`) and returns
+	 *  the resulting state.
+	 */
+	setAutostart: (enabled: boolean) => typedError<boolean, string>(__TAURI_INVOKE("set_autostart", { enabled })),
+	/**  Queries the release feed. `None` when the app is up to date. */
+	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
+	/**
+	 *  Downloads, verifies and installs the newest release, then relaunches. Emits
+	 *  `update-progress` while downloading. On Windows the installer ends the process itself.
+	 */
+	installUpdate: () => typedError<null, string>(__TAURI_INVOKE("install_update")),
 };
 
 /* Types */
@@ -435,6 +448,8 @@ export type Settings = {
 	notificationsEnabled: boolean,
 	/**  0 turns reminders off; otherwise 300 to 14400. */
 	reminderIntervalSecs: number,
+	/**  True once the user answered the "start with Windows" hint on the dashboard. */
+	startupHintDismissed: boolean,
 };
 
 export type SettingsUpdate = SettingsUpdate_Serialize | SettingsUpdate_Deserialize;
@@ -449,6 +464,7 @@ export type SettingsUpdate_Deserialize = {
 	importOnStartup?: boolean | null,
 	notificationsEnabled?: boolean | null,
 	reminderIntervalSecs?: number | null,
+	startupHintDismissed?: boolean | null,
 };
 
 export type SettingsUpdate_Serialize = {
@@ -461,6 +477,7 @@ export type SettingsUpdate_Serialize = {
 	importOnStartup: boolean | null,
 	notificationsEnabled: boolean | null,
 	reminderIntervalSecs: number | null,
+	startupHintDismissed: boolean | null,
 };
 
 export type SteamApiSettings = SteamApiSettings_Serialize | SteamApiSettings_Deserialize;
@@ -494,6 +511,27 @@ export type TrackerStatus_Serialize = {
 	trackingEnabled: boolean,
 	active: ActiveSession[],
 	lastPollAt: number | null,
+};
+
+/**  Release found by the updater feed. */
+export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;
+
+/**  Release found by the updater feed. */
+export type UpdateInfo_Deserialize = {
+	version: string,
+	currentVersion: string,
+	/**  Release date as an ISO string, when the feed provides it. */
+	date?: string | null,
+	notes?: string | null,
+};
+
+/**  Release found by the updater feed. */
+export type UpdateInfo_Serialize = {
+	version: string,
+	currentVersion: string,
+	/**  Release date as an ISO string, when the feed provides it. */
+	date: string | null,
+	notes: string | null,
 };
 
 /* Tauri Specta runtime */

@@ -2,6 +2,7 @@ use tauri::{AppHandle, State};
 use tauri_plugin_store::StoreExt;
 
 use super::now;
+use crate::core::settings::backfill_settings;
 use crate::core::types::{Settings, SettingsUpdate};
 use crate::error::{AppError, AppResult};
 use crate::runtime::emit_tracker_events;
@@ -20,16 +21,7 @@ pub fn load_settings(app: &AppHandle) -> Settings {
         .store(SETTINGS_FILE)
         .ok()
         .and_then(|store| store.get(SETTINGS_KEY))
-        .map(|mut value| {
-            // Settings saved before Phase 3 lack this field; keep them instead of resetting.
-            if let Some(obj) = value.as_object_mut() {
-                obj.entry("importOnStartup").or_insert(true.into());
-                // Same for the Phase 4 fields.
-                obj.entry("notificationsEnabled").or_insert(true.into());
-                obj.entry("reminderIntervalSecs").or_insert(0.into());
-            }
-            value
-        })
+        .map(backfill_settings)
         .and_then(|value| serde_json::from_value::<Settings>(value).ok())
         .filter(|s| s.validate().is_ok());
     stored.unwrap_or_default()

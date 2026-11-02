@@ -15,6 +15,9 @@
     },
     "notification:default",
     "store:default",
-    "window-state:default"
+    "window-state:default",
+    "autostart:default",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

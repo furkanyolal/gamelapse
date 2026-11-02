@@ -1,6 +1,6 @@
 [package]
 name = "gamelapse"
-version = "0.1.0"
+version = "1.0.0"
 description = "Open source Windows game time tracker"
 authors = ["Furkan YOLAL"]
 license = "MIT"
@@ -23,6 +23,10 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-store = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+time = { version = "0.3", features = ["formatting"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 rusqlite_migration = "2.6"
 serde = { version = "1", features = ["derive"] }

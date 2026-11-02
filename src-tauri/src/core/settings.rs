@@ -20,8 +20,24 @@ impl Default for Settings {
             import_on_startup: true,
             notifications_enabled: true,
             reminder_interval_secs: 0,
+            startup_hint_dismissed: false,
         }
     }
+}
+
+/// Adds fields introduced after a settings object was saved, so older files keep their values
+/// instead of being reset to defaults.
+pub fn backfill_settings(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = value.as_object_mut() {
+        // Phase 3.
+        obj.entry("importOnStartup").or_insert(true.into());
+        // Phase 4.
+        obj.entry("notificationsEnabled").or_insert(true.into());
+        obj.entry("reminderIntervalSecs").or_insert(0.into());
+        // Phase 6.
+        obj.entry("startupHintDismissed").or_insert(false.into());
+    }
+    value
 }
 
 impl Settings {
@@ -81,6 +97,9 @@ impl Settings {
         }
         if let Some(v) = patch.reminder_interval_secs {
             next.reminder_interval_secs = v;
+        }
+        if let Some(v) = patch.startup_hint_dismissed {
+            next.startup_hint_dismissed = v;
         }
         next.validate()?;
         Ok(next)

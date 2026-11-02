@@ -32,7 +32,7 @@ import {
   useScanImportSource,
 } from "@/hooks/use-import";
 import { formatDuration } from "@/lib/format";
-import { SOURCE_LABELS } from "@/lib/import-sources";
+import { IMPORT_SOURCES, SOURCE_LABELS } from "@/lib/import-sources";
 
 interface Props {
   open: boolean;
@@ -91,7 +91,7 @@ function ImportForm({ initialSource }: { initialSource: ImportSource | null }) {
               <SelectValue placeholder="Choose a launcher" />
             </SelectTrigger>
             <SelectContent>
-              {(["steam", "epic", "gog"] as const).map((s) => {
+              {IMPORT_SOURCES.map((s) => {
                 const available = sources.data?.find(
                   (x) => x.source === s,
                 )?.available;

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router";
-import { Download, Play, Plus } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { Download, FolderSearch, Play, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { GameCover } from "@/components/game-cover";
 import { ImportDialog } from "@/components/import-dialog";
 import { PageHeader } from "@/components/page-header";
+import { ScanDialog } from "@/components/scan-dialog";
 import { EmptyState, ErrorState, RowsSkeleton } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useAddGameFromExe, useGames } from "@/hooks/use-games";
+import { useScanRoots } from "@/hooks/use-scan";
 import { useTags } from "@/hooks/use-tags";
 import { useStartManualSession, useTrackerStatus } from "@/hooks/use-tracker";
 import { formatDuration, formatRelative } from "@/lib/format";
@@ -20,6 +22,9 @@ export default function Games() {
   const [search, setSearch] = useState("");
   const [showHidden, setShowHidden] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  const navigate = useNavigate();
+  const roots = useScanRoots();
   const games = useGames(showHidden);
   const status = useTrackerStatus();
   const addGame = useAddGameFromExe();
@@ -59,12 +64,23 @@ export default function Games() {
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Download /> Import
           </Button>
+          <Button
+            variant="outline"
+            disabled={roots.isPending}
+            onClick={() => {
+              if (roots.data && roots.data.length > 0) setScanOpen(true);
+              else navigate("/settings#games-folders");
+            }}
+          >
+            <FolderSearch /> Scan folders
+          </Button>
           <Button onClick={handleAdd} disabled={addGame.isPending}>
             <Plus /> Add game
           </Button>
         </div>
       </div>
       <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      {scanOpen && <ScanDialog open onOpenChange={setScanOpen} />}
 
       <div className="flex flex-wrap items-center gap-4">
         <Input

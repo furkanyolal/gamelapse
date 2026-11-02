@@ -358,11 +358,16 @@ describe("mock api: limits", () => {
 });
 
 describe("mock api: launcher imports", () => {
-  it("lists all three sources with Epic unavailable", async () => {
+  it("lists all four sources with Epic unavailable", async () => {
     const api = createMockApi({ empty: true });
     const sources = await api.listImportSources();
-    expect(sources.map((s) => s.source)).toEqual(["steam", "epic", "gog"]);
-    expect(sources.map((s) => s.available)).toEqual([true, false, true]);
+    expect(sources.map((s) => s.source)).toEqual([
+      "steam",
+      "epic",
+      "gog",
+      "heroic",
+    ]);
+    expect(sources.map((s) => s.available)).toEqual([true, false, true, true]);
     expect(sources[1].detail).toBeTruthy();
     await expect(api.scanImportSource("epic")).rejects.toThrow();
   });

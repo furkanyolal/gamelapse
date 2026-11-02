@@ -77,6 +77,15 @@ export function createTauriApi(): Api {
     setAutostart: (enabled) => call("set_autostart", { enabled }),
     checkForUpdate: () => call("check_for_update"),
     installUpdate: () => call("install_update"),
+    pickFolder: () => call("pick_folder"),
+    listScanRoots: () => call("list_scan_roots"),
+    addScanRoot: (path) => call("add_scan_root", { path }),
+    removeScanRoot: (rootId) => call("remove_scan_root", { rootId }),
+    scanFolders: (rootIds) => call("scan_folders", { rootIds }),
+    addScannedGames: (selection) => call("add_scanned_games", { selection }),
+    lookupGameMetadata: (name) => call("lookup_game_metadata", { name }),
+    applyGameMetadata: (gameId, match, renameGame) =>
+      call("apply_game_metadata", { gameId, match, renameGame }),
     on: (event, handler) => {
       // listen() is async; unsubscribe even if it is called before it resolves.
       let cancelled = false;

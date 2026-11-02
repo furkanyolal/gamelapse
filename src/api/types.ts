@@ -1,6 +1,6 @@
 // Hand-mirrored from docs/contract.md until the generated bindings replace it.
 
-export type GameSource = "manual" | "steam" | "epic" | "gog";
+export type GameSource = "manual" | "steam" | "epic" | "gog" | "amazon";
 export type SessionSource = "auto" | "manual" | "imported";
 export type MatchMode = "exact_path" | "install_dir_prefix" | "exe_name";
 export type Theme = "dark" | "light" | "system";
@@ -188,7 +188,49 @@ export interface Reminder {
   elapsedSecs: number;
 }
 
-export type ImportSource = "steam" | "epic" | "gog";
+export type ImportSource = "steam" | "epic" | "gog" | "heroic";
+
+export interface ScanRoot {
+  id: number;
+  path: string;
+  createdAt: number;
+}
+
+export interface ExeCandidate {
+  path: string;
+  sizeBytes: number;
+  /** Higher is more likely the main game executable */
+  score: number;
+  /** Short human-readable reasons, e.g. "name matches folder" */
+  reasons: string[];
+}
+
+export interface ScanCandidate {
+  rootId: number;
+  /** Absolute path of the top-level folder under the root */
+  folder: string;
+  /** Cleaned from the folder name */
+  suggestedName: string;
+  /** Sorted by score, descending; junk excluded; at most 8 */
+  executables: ExeCandidate[];
+  confidence: "high" | "medium" | "low";
+  /** A library game already has an executable rule under this folder */
+  existingGameId: number | null;
+}
+
+export interface ScanSelection {
+  folder: string;
+  name: string;
+  exePath: string;
+  /** Optional cover to download, from a metadata match */
+  coverUrl: string | null;
+}
+
+export interface MetadataMatch {
+  steamAppId: number;
+  name: string;
+  coverUrl: string;
+}
 
 export interface ImportSourceStatus {
   source: ImportSource;

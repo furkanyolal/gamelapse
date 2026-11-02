@@ -24,6 +24,10 @@ import type {
   LimitInput,
   LimitStatus,
   MatchMode,
+  MetadataMatch,
+  ScanCandidate,
+  ScanRoot,
+  ScanSelection,
   Session,
   SessionQuery,
   SessionUpdate,
@@ -101,6 +105,18 @@ export interface Api {
   setAutostart(enabled: boolean): Promise<boolean>;
   checkForUpdate(): Promise<UpdateInfo | null>;
   installUpdate(): Promise<null>;
+  pickFolder(): Promise<string | null>;
+  listScanRoots(): Promise<ScanRoot[]>;
+  addScanRoot(path: string): Promise<ScanRoot>;
+  removeScanRoot(rootId: number): Promise<null>;
+  scanFolders(rootIds: number[] | null): Promise<ScanCandidate[]>;
+  addScannedGames(selection: ScanSelection[]): Promise<ImportResult>;
+  lookupGameMetadata(name: string): Promise<MetadataMatch[]>;
+  applyGameMetadata(
+    gameId: number,
+    match: MetadataMatch,
+    renameGame: boolean,
+  ): Promise<Game>;
   /** Subscribe to a backend event; returns the unsubscribe function. */
   on<E extends ApiEventName>(
     event: E,

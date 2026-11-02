@@ -6,8 +6,13 @@ import type {
   ApiEventName,
   DailyTotal,
   Game,
+  ExeCandidate,
   GameExecutable,
+  GameSource,
   GameSummary,
+  MetadataMatch,
+  ScanCandidate,
+  ScanRoot,
   HourlyTotal,
   DiscoveredGame,
   ImportResult,
@@ -83,6 +88,8 @@ const steamCover = (appId: string) =>
 type CatalogEntry = Omit<DiscoveredGame, "alreadyImported"> & {
   /** Counts as imported from the start, as if an earlier run had added it. */
   preImported?: boolean;
+  /** Source of the created game, when it differs from the import source. */
+  gameSource?: GameSource;
 };
 
 function steamEntry(
@@ -127,6 +134,26 @@ const IMPORT_CATALOG: Record<ImportSource, CatalogEntry[]> = {
       playtimeMinutes: 5400,
     },
   ],
+  heroic: [
+    {
+      source: "heroic",
+      gameSource: "epic",
+      sourceId: "Sugar",
+      name: "Hades",
+      installDir: "d:\\heroic\\hades",
+      executables: ["d:\\heroic\\hades\\x64\\hades.exe"],
+      playtimeMinutes: null,
+    },
+    {
+      source: "heroic",
+      gameSource: "gog",
+      sourceId: "1207658930",
+      name: "The Witcher: Enhanced Edition",
+      installDir: "d:\\heroic\\the witcher",
+      executables: ["d:\\heroic\\the witcher\\system\\witcher.exe"],
+      playtimeMinutes: 320,
+    },
+  ],
 };
 
 const IMPORT_AVAILABILITY: Record<
@@ -140,7 +167,30 @@ const IMPORT_AVAILABILITY: Record<
       "Epic Games Launcher not found (no manifests in C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests)",
   },
   gog: { available: true, detail: "C:\\Program Files (x86)\\GOG Galaxy" },
+  heroic: {
+    available: true,
+    detail: "C:\\Users\\mock\\AppData\\Roaming\\heroic",
+  },
 };
+
+const IMPORT_SOURCES: ImportSource[] = ["steam", "epic", "gog", "heroic"];
+
+function exe(
+  folder: string,
+  rel: string,
+  sizeMb: number,
+  score: number,
+  reasons: string[],
+): ExeCandidate {
+  return {
+    path: `${folder}\\${rel}`,
+    sizeBytes: sizeMb * 1_048_576,
+    score,
+    reasons,
+  };
+}
+
+const SCAN_FOLDER = "D:\\Games";
 
 /** Small deterministic PRNG. */
 function mulberry32(seed: number): () => number {
@@ -206,7 +256,11 @@ export function createMockApi(options: MockOptions = {}): Api {
     steam: null,
     epic: null,
     gog: null,
+    heroic: null,
   };
+  let scanRoots: ScanRoot[] = [{ id: 1, path: SCAN_FOLDER, createdAt: 0 }];
+  let nextRootId = 2;
+  let folderPickCounter = 0;
   let steamApi: SteamApiSettings = { apiKey: null, steamId64: null };
   let limits: StoredLimit[] = [];
   let nextLimitId = 1;
@@ -397,7 +451,89 @@ export function createMockApi(options: MockOptions = {}): Api {
   }
 
   function findImported(source: ImportSource, sourceId: string) {
-    return games.find((g) => g.source === source && g.sourceId === sourceId);
+    return games.find(
+      (g) =>
+        (g.source === source ||
+          IMPORT_CATALOG[source].some(
+            (e) => e.sourceId === sourceId && e.gameSource === g.source,
+          )) &&
+        g.sourceId === sourceId,
+    );
+  }
+
+  function scanCandidates(): ScanCandidate[] {
+    const f = (name: string) => `${SCAN_FOLDER}\\${name}`;
+    const one = f("Elden.Ring.v1.02-FitGirl");
+    const two = f("Hollow_Knight");
+    const three = f("Mystery Project");
+    const four = f("Portal 2");
+    const under = (folder: string) =>
+      executables.find((e) =>
+        normalisePath(e.exePath).startsWith(normalisePath(folder) + "\\"),
+      )?.gameId;
+    const existing = {
+      id: under(one) ?? games.find((g) => g.name === "Elden Ring")?.id ?? null,
+    };
+    return [
+      {
+        rootId: 1,
+        folder: one,
+        suggestedName: "Elden Ring",
+        executables: [
+          exe(one, "Game\\eldenring.exe", 98, 95, [
+            "name matches folder",
+            "largest executable in the folder",
+          ]),
+          exe(one, "Game\\launcher.exe", 4, 25, ["name contains launcher"]),
+        ],
+        confidence: "high",
+        existingGameId: existing.id,
+      },
+      {
+        rootId: 1,
+        folder: two,
+        suggestedName: "Hollow Knight",
+        executables: [
+          exe(two, "hollow_knight.exe", 640, 75, [
+            "name matches folder",
+            "sits in the folder root",
+          ]),
+          exe(two, "UnityCrashHandler64.exe", 1, 10, [
+            "sits in the folder root",
+          ]),
+          exe(two, "tools\\configtool.exe", 2, -10, ["name contains tool"]),
+        ],
+        confidence: "high",
+        existingGameId: null,
+      },
+      {
+        rootId: 1,
+        folder: three,
+        suggestedName: "Mystery Project",
+        executables: [
+          exe(three, "bin\\x64\\project.exe", 40, 45, [
+            "sits in bin\\x64",
+            "largest executable in the folder",
+          ]),
+          exe(three, "bin\\x64\\server.exe", 38, 15, ["name contains server"]),
+          exe(three, "editor.exe", 20, 5, ["name contains editor"]),
+          exe(three, "benchmark.exe", 12, 0, ["name contains benchmark"]),
+        ],
+        confidence: "medium",
+        existingGameId: null,
+      },
+      {
+        rootId: 1,
+        folder: four,
+        suggestedName: "Portal 2",
+        executables: [
+          exe(four, "portal2.exe", 2, 35, ["name matches folder"]),
+          exe(four, "bin\\portal2_srv.exe", 1, 10, ["name contains server"]),
+        ],
+        confidence: "low",
+        existingGameId: null,
+      },
+    ];
   }
 
   function requireAvailable(source: ImportSource) {
@@ -443,7 +579,9 @@ export function createMockApi(options: MockOptions = {}): Api {
         continue;
       }
       const game = insertGame(d.name, {
-        source,
+        source:
+          IMPORT_CATALOG[source].find((e) => e.sourceId === d.sourceId)
+            ?.gameSource ?? (source as GameSource),
         sourceId: d.sourceId,
         installDir: d.installDir,
         coverPath: source === "steam" ? steamCover(d.sourceId) : null,
@@ -1046,14 +1184,12 @@ export function createMockApi(options: MockOptions = {}): Api {
       return null;
     },
     async listImportSources() {
-      return (["steam", "epic", "gog"] as const).map<ImportSourceStatus>(
-        (source) => ({
-          source,
-          available: IMPORT_AVAILABILITY[source].available,
-          detail: IMPORT_AVAILABILITY[source].detail,
-          lastScanAt: lastScanAt[source],
-        }),
-      );
+      return IMPORT_SOURCES.map<ImportSourceStatus>((source) => ({
+        source,
+        available: IMPORT_AVAILABILITY[source].available,
+        detail: IMPORT_AVAILABILITY[source].detail,
+        lastScanAt: lastScanAt[source],
+      }));
     },
     async scanImportSource(source) {
       const found = discover(source);
@@ -1277,6 +1413,111 @@ export function createMockApi(options: MockOptions = {}): Api {
         emit("update-progress", { downloaded: (total / 5) * i, total });
       }
       return null;
+    },
+    async pickFolder() {
+      folderPickCounter += 1;
+      return `E:\\Mock Games ${folderPickCounter}`;
+    },
+    async listScanRoots() {
+      return [...scanRoots]
+        .sort((a, b) => a.path.localeCompare(b.path))
+        .map((r) => ({ ...r }));
+    },
+    async addScanRoot(path) {
+      const p = path.trim().replace(/[\\/]+$/, "");
+      if (!p) throw new Error("Choose a folder");
+      const key = p.toLowerCase();
+      for (const r of scanRoots) {
+        const rk = r.path.toLowerCase();
+        if (rk === key) throw new Error("That folder is already added");
+        if (key.startsWith(rk + "\\") || rk.startsWith(key + "\\")) {
+          throw new Error("That folder overlaps one that is already added");
+        }
+      }
+      const root: ScanRoot = { id: nextRootId++, path: p, createdAt: now() };
+      scanRoots.push(root);
+      return { ...root };
+    },
+    async removeScanRoot(rootId) {
+      scanRoots = scanRoots.filter((r) => r.id !== rootId);
+      return null;
+    },
+    async scanFolders(rootIds) {
+      await new Promise((r) => setTimeout(r, 600));
+      const wanted = rootIds ?? scanRoots.map((r) => r.id);
+      if (!scanRoots.some((r) => wanted.includes(r.id))) return [];
+      return scanCandidates();
+    },
+    async addScannedGames(selection) {
+      const result: ImportResult = {
+        // The contract does not define a source for folder scans; the UI ignores it.
+        source: "steam",
+        discovered: selection.length,
+        added: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [],
+      };
+      for (const sel of selection) {
+        const name = sel.name.trim();
+        const rule = normalisePath(sel.exePath);
+        if (!name) {
+          result.errors.push(`${sel.folder}: name cannot be empty`);
+          result.skipped += 1;
+          continue;
+        }
+        if (executables.some((e) => e.exePath === rule)) {
+          result.skipped += 1;
+          continue;
+        }
+        const game = insertGame(name, {
+          installDir: sel.folder,
+          coverPath: sel.coverUrl,
+        });
+        executables.push(
+          {
+            id: nextExeId++,
+            gameId: game.id,
+            exePath: normalisePath(sel.folder),
+            matchMode: "install_dir_prefix",
+          },
+          {
+            id: nextExeId++,
+            gameId: game.id,
+            exePath: rule,
+            matchMode: "exact_path",
+          },
+        );
+        result.added += 1;
+      }
+      emit("library-changed", null);
+      return result;
+    },
+    async lookupGameMetadata(name) {
+      await new Promise((r) => setTimeout(r, 300));
+      if (name.toLowerCase().includes("fail")) {
+        throw new Error("Could not reach the Steam store");
+      }
+      const base = name.trim() || "Game";
+      const list: Omit<MetadataMatch, "coverUrl">[] = [
+        { steamAppId: 1245620, name: base },
+        { steamAppId: 1091500, name: `${base} Deluxe Edition` },
+        { steamAppId: 1086940, name: `${base} 2` },
+      ];
+      return list.map((m) => ({
+        ...m,
+        coverUrl: steamCover(String(m.steamAppId)),
+      }));
+    },
+    async applyGameMetadata(gameId, match, renameGame) {
+      const game = requireGame(gameId);
+      game.coverPath = match.coverUrl;
+      if (renameGame) {
+        game.name = match.name;
+        game.sortName = sortNameOf(match.name);
+      }
+      emit("library-changed", null);
+      return { ...game };
     },
     on(event, handler) {
       let set = listeners.get(event);

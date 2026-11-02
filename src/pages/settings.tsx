@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -14,6 +15,7 @@ import { ImportDialog } from "@/components/import-dialog";
 import { LimitBar } from "@/components/limit-bar";
 import { LimitDialog } from "@/components/limit-dialog";
 import { PageHeader } from "@/components/page-header";
+import { ScanDialog } from "@/components/scan-dialog";
 import { ErrorState, RowsSkeleton } from "@/components/query-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +65,11 @@ import {
   useUpdateCheckResult,
   useUpdateProgress,
 } from "@/hooks/use-system";
+import {
+  useAddScanRoot,
+  useRemoveScanRoot,
+  useScanRoots,
+} from "@/hooks/use-scan";
 import { useSetTrackingEnabled } from "@/hooks/use-tracker";
 import { formatDuration, formatRelativeShort } from "@/lib/format";
 import { limitTitle } from "@/lib/limits";
@@ -525,6 +532,88 @@ function LimitsCard({ settings }: { settings: AppSettings }) {
   );
 }
 
+function GamesFoldersCard() {
+  const roots = useScanRoots();
+  const addRoot = useAddScanRoot();
+  const removeRoot = useRemoveScanRoot();
+  const [scanOpen, setScanOpen] = useState(false);
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (hash === "#games-folders" && roots.data) {
+      document
+        .getElementById("games-folders")
+        ?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [hash, roots.data]);
+
+  const error = addRoot.error ?? removeRoot.error;
+
+  return (
+    <Card id="games-folders">
+      <CardHeader>
+        <CardTitle>Games folders</CardTitle>
+        <CardDescription>
+          Gamelapse scans only when you click Scan and adds only what you
+          confirm.
+        </CardDescription>
+        <CardAction>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={addRoot.isPending}
+            onClick={() => addRoot.mutate()}
+          >
+            <Plus /> Add folder
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {roots.isPending && <RowsSkeleton rows={2} />}
+        {roots.error && (
+          <ErrorState error={roots.error} onRetry={() => roots.refetch()} />
+        )}
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error.message}
+          </p>
+        )}
+        {roots.data?.length === 0 && (
+          <p className="text-muted-foreground text-sm">
+            No folders yet. Add the folder where you keep your games.
+          </p>
+        )}
+        <ul className="divide-y">
+          {roots.data?.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 py-2">
+              <span className="min-w-0 flex-1 font-mono text-sm break-all">
+                {r.path}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Remove ${r.path}`}
+                disabled={removeRoot.isPending}
+                onClick={() => removeRoot.mutate(r.id)}
+              >
+                <Trash2 /> Remove
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Button
+          variant="outline"
+          disabled={!roots.data?.length}
+          onClick={() => setScanOpen(true)}
+        >
+          Scan folders
+        </Button>
+      </CardContent>
+      {scanOpen && <ScanDialog open onOpenChange={setScanOpen} />}
+    </Card>
+  );
+}
+
 function ImportCard({ settings }: { settings: AppSettings }) {
   const sources = useImportSources();
   const update = useUpdateSettings();
@@ -939,6 +1028,7 @@ export default function Settings() {
       {settings.data && <TrackingCard settings={settings.data} />}
       {settings.data && <LimitsCard settings={settings.data} />}
       {settings.data && <ImportCard settings={settings.data} />}
+      <GamesFoldersCard />
       <SteamApiCard />
       <DataCard />
       <UpdatesCard />

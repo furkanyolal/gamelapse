@@ -29,6 +29,10 @@ export const keys = {
   importScan: (source: ImportSource) => ["import", "scan", source] as const,
   steamApi: ["steamApi"] as const,
   steamApiSettings: ["steamApi", "settings"] as const,
+  scanRoots: ["scanRoots"] as const,
+  scanRootsList: ["scanRoots", "list"] as const,
+  scanCandidates: ["scan", "candidates"] as const,
+  metadata: (name: string) => ["metadata", name] as const,
   limits: ["limits"] as const,
   limitsList: ["limits", "list"] as const,
   tags: ["tags"] as const,
@@ -43,6 +47,7 @@ type Family =
   | "settings"
   | "import"
   | "steamApi"
+  | "scanRoots"
   | "limits"
   | "tags";
 

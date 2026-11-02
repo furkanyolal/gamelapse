@@ -64,6 +64,13 @@ import {
   formatRelativeShort,
 } from "@/lib/format";
 
+const LAUNCHER_NAMES: Partial<Record<string, string>> = {
+  steam: "Steam",
+  epic: "Epic",
+  gog: "GOG",
+  amazon: "Amazon",
+};
+
 const MATCH_MODES: { value: MatchMode; label: string }[] = [
   { value: "exact_path", label: "Exact path" },
   { value: "install_dir_prefix", label: "Install folder" },
@@ -194,13 +201,14 @@ function GameDetailBody({ summary }: { summary: GameSummary }) {
           label="Last played"
           value={formatRelativeShort(summary.lastPlayedAt)}
         />
-        {summary.importedMinutes > 0 && (
-          <StatCard
-            label="Imported playtime"
-            value={formatDuration(summary.importedMinutes * 60)}
-          />
-        )}
       </div>
+      {summary.importedMinutes > 0 && (
+        <p className="text-muted-foreground -mt-3 text-sm">
+          Includes {formatDuration(summary.importedMinutes * 60)} reported by{" "}
+          {LAUNCHER_NAMES[game.source] ?? "your launcher"} before Gamelapse
+          started tracking.
+        </p>
+      )}
 
       <TagsCard summary={summary} />
       <CoverCard summary={summary} />

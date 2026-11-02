@@ -434,6 +434,45 @@ describe("mock api: launcher imports", () => {
     after.forEach((m, i) => expect(m).toBeGreaterThan(before[i]));
   });
 
+  it("includes the launcher baseline in all-time figures only", async () => {
+    const api = createMockApi({ empty: true });
+    await api.importGames("steam");
+    const hollow = (await api.listGames(false)).find(
+      (g) => g.game.name === "Hollow Knight",
+    )!;
+    expect(hollow.importedMinutes).toBe(2410);
+    expect(hollow.totalSecs).toBe(2410 * 60);
+    expect(hollow.todaySecs).toBe(0);
+    expect(hollow.weekSecs).toBe(0);
+
+    const stats = await api.getDashboardStats();
+    expect(stats.allTimeSecs).toBeGreaterThanOrEqual(2410 * 60);
+    expect(stats.topGames[0].totalSecs).toBeGreaterThanOrEqual(2410 * 60);
+    expect(stats.todaySecs).toBe(0);
+    expect(await api.getGameTotals(0, null, 5)).toEqual([]);
+
+    // Tracked time adds on top of the baseline.
+    const t = Math.floor(Date.now() / 1000);
+    await api.createSession(hollow.game.id, t - 7200, t - 3600, null);
+    const after = (await api.getGame(hollow.game.id))!;
+    expect(after.totalSecs).toBe(2410 * 60 + 3600);
+    expect(after.importedMinutes).toBe(2410);
+  });
+
+  it("applies max(existing, launcher - tracked) on re-import", async () => {
+    const api = createMockApi({ empty: true });
+    await api.importGames("steam");
+    const hollow = (await api.listGames(false)).find(
+      (g) => g.game.name === "Hollow Knight",
+    )!;
+    const end = Math.floor(Date.now() / 1000) - 60;
+    await api.createSession(hollow.game.id, end - 3600, end, null);
+    await api.importGames("steam");
+    const again = (await api.getGame(hollow.game.id))!;
+    expect(again.importedMinutes).toBe(2410);
+    expect(again.totalSecs).toBe(2410 * 60 + 3600);
+  });
+
   it("gives two demo games an https cover", async () => {
     const games = await createMockApi().listGames(false);
     const covers = games.map((g) => g.game.coverPath).filter(Boolean);

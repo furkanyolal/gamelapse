@@ -53,6 +53,34 @@ describe("Game detail", () => {
     expect(screen.getByRole("button", { name: /choose image/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /merge games/i })).toBeEnabled();
   });
+
+  it("shows the launcher baseline note only when importedMinutes > 0", async () => {
+    const [first] = await api.listGames(false);
+    expect(first.importedMinutes).toBe(0);
+    const plain = renderAt(
+      `/games/${first.game.id}`,
+      <GameDetail />,
+      "/games/:id",
+    );
+    await screen.findByText("Tags");
+    expect(
+      screen.queryByText(/Includes .* reported by/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Imported playtime")).not.toBeInTheDocument();
+    plain.unmount();
+
+    await api.importGames("steam");
+    const hollow = (await api.listGames(false)).find(
+      (g) => g.game.name === "Hollow Knight",
+    )!;
+    expect(hollow.importedMinutes).toBeGreaterThan(0);
+    renderAt(`/games/${hollow.game.id}`, <GameDetail />, "/games/:id");
+    expect(
+      await screen.findByText(
+        /Includes .* reported by Steam before Gamelapse started tracking\./,
+      ),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("Settings Data card", () => {

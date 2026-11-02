@@ -433,13 +433,33 @@ export function createMockApi(options: MockOptions = {}): Api {
     return name;
   }
 
+  function trackedSecs(gameId: number): number {
+    return sessions
+      .filter((s) => s.gameId === gameId)
+      .reduce((n, s) => n + durationOf(s), 0);
+  }
+
+  /** All-time seconds: tracked sessions plus the launcher baseline. */
+  function allTimeSecsOf(gameId: number): number {
+    return trackedSecs(gameId) + (importedMinutes.get(gameId) ?? 0) * 60;
+  }
+
+  /** Write rule: minutes = max(existing, launcher - tracked), never shrinking. */
+  function applyLauncherMinutes(gameId: number, launcherMinutes: number) {
+    const tracked = Math.floor(trackedSecs(gameId) / 60);
+    importedMinutes.set(
+      gameId,
+      Math.max(importedMinutes.get(gameId) ?? 0, launcherMinutes - tracked),
+    );
+  }
+
   function summaryOf(game: Game): GameSummary {
     const own = sessions.filter((s) => s.gameId === game.id);
     const today = localMidnight(now());
     return {
       game: { ...game },
       tags: tagsOf(game.id),
-      totalSecs: own.reduce((n, s) => n + durationOf(s), 0),
+      totalSecs: allTimeSecsOf(game.id),
       todaySecs: sumWithin(own, today, Infinity),
       weekSecs: sumWithin(own, localMidnight(now(), -6), Infinity),
       sessionCount: own.length,
@@ -569,7 +589,7 @@ export function createMockApi(options: MockOptions = {}): Api {
       if (existing) {
         existing.installDir = d.installDir;
         if (d.playtimeMinutes !== null) {
-          importedMinutes.set(existing.id, d.playtimeMinutes);
+          applyLauncherMinutes(existing.id, d.playtimeMinutes);
         }
         result.updated += 1;
         continue;
@@ -603,7 +623,7 @@ export function createMockApi(options: MockOptions = {}): Api {
         });
       }
       if (d.playtimeMinutes !== null) {
-        importedMinutes.set(game.id, d.playtimeMinutes);
+        applyLauncherMinutes(game.id, d.playtimeMinutes);
       }
       result.added += 1;
     }
@@ -1047,13 +1067,17 @@ export function createMockApi(options: MockOptions = {}): Api {
     },
     async getDashboardStats() {
       const topMap = new Map<number, number>();
-      sessions.forEach((s) =>
-        topMap.set(s.gameId, (topMap.get(s.gameId) ?? 0) + durationOf(s)),
-      );
+      sessions.forEach((s) => topMap.set(s.gameId, 0));
+      importedMinutes.forEach((m, gameId) => {
+        if (m > 0 && games.some((g) => g.id === gameId)) topMap.set(gameId, 0);
+      });
+      topMap.forEach((_, gameId) => topMap.set(gameId, allTimeSecsOf(gameId)));
+      let allTime = 0;
+      topMap.forEach((secs) => (allTime += secs));
       return {
         todaySecs: sumWithin(sessions, localMidnight(now()), Infinity),
         weekSecs: sumWithin(sessions, localMidnight(now(), -6), Infinity),
-        allTimeSecs: sessions.reduce((n, s) => n + durationOf(s), 0),
+        allTimeSecs: allTime,
         gamesPlayedCount: topMap.size,
         topGames: [...topMap.entries()]
           .map(([gameId, totalSecs]) => ({
@@ -1223,11 +1247,7 @@ export function createMockApi(options: MockOptions = {}): Api {
         const base = IMPORT_CATALOG.steam.find(
           (e) => e.sourceId === g.sourceId,
         );
-        importedMinutes.set(
-          g.id,
-          Math.max(importedMinutes.get(g.id) ?? 0, base?.playtimeMinutes ?? 0) +
-            60,
-        );
+        applyLauncherMinutes(g.id, (base?.playtimeMinutes ?? 0) + 60);
       }
       emit("library-changed", null);
       return {

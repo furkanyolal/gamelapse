@@ -10,9 +10,11 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::Connection;
 
 use crate::core::db::repo;
+use crate::core::idle::IdleReading;
+use crate::core::limits::LimitMonitor;
 use crate::core::types::{
-    ActiveSession, ActiveSource, GameExecutable, MatchMode, Session, SessionSource, Settings,
-    TrackerStatus,
+    ActiveSession, ActiveSource, GameExecutable, LimitStatus, MatchMode, Reminder, Session,
+    SessionSource, Settings, TrackerStatus,
 };
 use crate::error::{AppError, AppResult};
 
@@ -106,6 +108,8 @@ pub enum TrackerEvent {
     Updated(ActiveSession),
     Ended(Session),
     StatusChanged(TrackerStatus),
+    LimitReached(LimitStatus),
+    Reminder(Reminder),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -113,6 +117,37 @@ struct Entry {
     session_id: i32,
     source: ActiveSource,
     misses: u8,
+    /// Currently AFK.
+    afk: bool,
+    /// Cumulative AFK seconds; mirrors `sessions.afk_secs`.
+    afk_secs: i64,
+    /// Wall-clock time up to which AFK time has been accounted.
+    afk_counted_to: i64,
+    /// Non-AFK elapsed seconds when the entry was created (non-zero for a reopened session).
+    start_elapsed: i64,
+    /// Reminder interval and the last multiple of it already reminded (or skipped).
+    reminded: Option<(u32, i64)>,
+}
+
+impl Entry {
+    fn new(
+        session_id: i32,
+        source: ActiveSource,
+        afk_secs: i64,
+        start_elapsed: i64,
+        now: i64,
+    ) -> Self {
+        Self {
+            session_id,
+            source,
+            misses: 0,
+            afk: false,
+            afk_secs,
+            afk_counted_to: now,
+            start_elapsed,
+            reminded: None,
+        }
+    }
 }
 
 #[derive(Default)]
@@ -123,11 +158,17 @@ pub struct Tracker {
     /// ignored until a poll no longer sees the process.
     suppressed: HashSet<i32>,
     last_poll_at: Option<i64>,
+    limits: LimitMonitor,
 }
 
 impl Tracker {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// True while any session is open; the runtime samples idle time only then.
+    pub fn has_active(&self) -> bool {
+        !self.active.is_empty()
     }
 
     fn active_view(&self, conn: &Connection, game_id: i32, now: i64) -> AppResult<ActiveSession> {
@@ -141,8 +182,70 @@ impl Tracker {
             started_at: session.started_at,
             elapsed_secs: session.duration_secs,
             afk_secs: session.afk_secs,
-            is_afk: false,
+            is_afk: entry.afk,
             source: entry.source,
+        })
+    }
+
+    /// Applies one idle reading to a session's AFK state and persists `afk_secs`.
+    ///
+    /// AFK begins when idle time exceeds the threshold (or the workstation is locked) and is
+    /// back-dated to the last input, so the idle stretch is not counted as play. While AFK,
+    /// each poll adds the time since the previous one. The first poll below the threshold ends it.
+    fn update_afk(
+        &mut self,
+        conn: &Connection,
+        game_id: i32,
+        settings: &Settings,
+        idle: IdleReading,
+        now: i64,
+    ) -> AppResult<()> {
+        let mut entry = self.active[&game_id];
+        let threshold = settings.afk_threshold_secs;
+        // A threshold of 0 turns detection off.
+        let enabled = threshold > 0 && repo::get_game(conn, game_id)?.afk_detection_enabled;
+        let idle_over = idle.locked || idle.idle_secs.is_some_and(|i| i > threshold);
+        if enabled && idle_over {
+            let from = if entry.afk {
+                entry.afk_counted_to
+            } else {
+                let started = repo::get_session(conn, entry.session_id, now)?.started_at;
+                let last_input = now - idle.idle_secs.unwrap_or(0).max(0);
+                entry.afk = true;
+                last_input.max(started).max(entry.afk_counted_to)
+            };
+            entry.afk_secs += (now - from).max(0);
+            entry.afk_counted_to = now;
+        } else {
+            // `afk_counted_to` stays put: any later AFK episode starts at an input newer than it.
+            entry.afk = false;
+        }
+        repo::write_afk_secs(conn, entry.session_id, entry.afk_secs)?;
+        self.active.insert(game_id, entry);
+        Ok(())
+    }
+
+    /// A reminder when the session's non-AFK elapsed time passed a new multiple of `interval`.
+    /// Only one reminder per poll, even if several multiples passed.
+    fn check_reminder(&mut self, view: &ActiveSession, interval: u32) -> Option<Reminder> {
+        let entry = self.active.get_mut(&view.game_id)?;
+        if interval == 0 {
+            entry.reminded = Some((0, 0));
+            return None;
+        }
+        let multiple = view.elapsed_secs / i64::from(interval);
+        let last = match entry.reminded {
+            Some((iv, last)) if iv == interval => last,
+            // Interval changed mid-session: start counting from where the session is now.
+            Some(_) => multiple,
+            None => entry.start_elapsed / i64::from(interval),
+        };
+        entry.reminded = Some((interval, last.max(multiple)));
+        (multiple > last).then(|| Reminder {
+            session_id: view.session_id,
+            game_id: view.game_id,
+            game_name: view.game_name.clone(),
+            elapsed_secs: view.elapsed_secs,
         })
     }
 
@@ -221,11 +324,7 @@ impl Tracker {
         repo::write_heartbeat(conn, session.id, now)?;
         self.active.insert(
             game_id,
-            Entry {
-                session_id: session.id,
-                source: ActiveSource::Manual,
-                misses: 0,
-            },
+            Entry::new(session.id, ActiveSource::Manual, 0, 0, now),
         );
         let view = self.active_view(conn, game_id, now)?;
         let events = vec![
@@ -266,17 +365,20 @@ impl Tracker {
         settings: &Settings,
         source: &mut dyn ProcessSource,
         clock: &dyn Clock,
+        idle: IdleReading,
     ) -> AppResult<Vec<TrackerEvent>> {
         let snapshot = settings.tracking_enabled.then(|| source.snapshot());
-        self.tick(conn, settings, snapshot.as_ref(), clock.now())
+        self.tick(conn, settings, snapshot.as_ref(), idle, clock.now())
     }
 
     /// One poll. `snapshot` is `None` while tracking is disabled; manual sessions still tick.
+    /// `idle` is the idle sample for this poll; the default (unknown, unlocked) never goes AFK.
     pub fn tick(
         &mut self,
         conn: &Connection,
         settings: &Settings,
         snapshot: Option<&Snapshot>,
+        idle: IdleReading,
         now: i64,
     ) -> AppResult<Vec<TrackerEvent>> {
         self.last_poll_at = Some(now);
@@ -316,29 +418,33 @@ impl Tracker {
                 // A manual session for the game blocks the auto one.
                 continue;
             }
-            let session_id = match repo::last_ended_auto_session(conn, game_id)? {
-                Some(prev)
-                    if prev
-                        .ended_at
-                        .is_some_and(|e| e + settings.session_merge_gap_secs >= now) =>
-                {
-                    repo::reopen_session(conn, prev.id, now)?;
-                    prev.id
-                }
-                _ => {
-                    let s =
-                        repo::insert_session(conn, game_id, now, None, SessionSource::Auto, None)?;
-                    repo::write_heartbeat(conn, s.id, now)?;
-                    s.id
-                }
-            };
+            let (session_id, afk_secs, elapsed) =
+                match repo::last_ended_auto_session(conn, game_id)? {
+                    Some(prev)
+                        if prev
+                            .ended_at
+                            .is_some_and(|e| e + settings.session_merge_gap_secs >= now) =>
+                    {
+                        repo::reopen_session(conn, prev.id, now)?;
+                        let reopened = repo::get_session(conn, prev.id, now)?;
+                        (prev.id, reopened.afk_secs, reopened.duration_secs)
+                    }
+                    _ => {
+                        let s = repo::insert_session(
+                            conn,
+                            game_id,
+                            now,
+                            None,
+                            SessionSource::Auto,
+                            None,
+                        )?;
+                        repo::write_heartbeat(conn, s.id, now)?;
+                        (s.id, 0, 0)
+                    }
+                };
             self.active.insert(
                 game_id,
-                Entry {
-                    session_id,
-                    source: ActiveSource::Auto,
-                    misses: 0,
-                },
+                Entry::new(session_id, ActiveSource::Auto, afk_secs, elapsed, now),
             );
             started.push(game_id);
         }
@@ -366,15 +472,38 @@ impl Tracker {
             }
         }
 
+        // Sessions that missed this poll got no heartbeat, so their AFK state stays as it was.
+        for game_id in self.sorted_game_ids() {
+            let entry = self.active[&game_id];
+            if entry.source == ActiveSource::Manual || matched.contains(&game_id) {
+                self.update_afk(conn, game_id, settings, idle, now)?;
+            }
+        }
+
         let changed = !started.is_empty() || !ended.is_empty();
         let mut events = Vec::new();
         for game_id in started {
             events.push(TrackerEvent::Started(self.active_view(conn, game_id, now)?));
         }
         events.extend(ended);
+        let mut reminders = Vec::new();
         for game_id in self.sorted_game_ids() {
-            events.push(TrackerEvent::Updated(self.active_view(conn, game_id, now)?));
+            let view = self.active_view(conn, game_id, now)?;
+            reminders.extend(self.check_reminder(&view, settings.reminder_interval_secs));
+            events.push(TrackerEvent::Updated(view));
         }
+        events.extend(reminders.into_iter().map(TrackerEvent::Reminder));
+
+        let counting: Vec<i32> = self
+            .sorted_game_ids()
+            .into_iter()
+            .filter(|id| !self.active[id].afk)
+            .collect();
+        match self.limits.evaluate(conn, now, &counting) {
+            Ok(due) => events.extend(due.into_iter().map(TrackerEvent::LimitReached)),
+            Err(e) => tracing::warn!(error = %e, "limit evaluation failed"),
+        }
+
         if changed {
             events.push(TrackerEvent::StatusChanged(self.status(
                 conn,

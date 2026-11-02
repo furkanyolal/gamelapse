@@ -60,6 +60,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::imports::get_steam_api_settings,
         commands::imports::set_steam_api_settings,
         commands::imports::fetch_steam_playtime,
+        commands::limits::list_limits,
+        commands::limits::create_limit,
+        commands::limits::update_limit,
+        commands::limits::delete_limit,
     ])
 }
 
@@ -140,6 +144,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {

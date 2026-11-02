@@ -95,6 +95,7 @@ impl Rig {
                 &self.settings,
                 &mut source as &mut dyn ProcessSource,
                 &self.clock,
+                Default::default(),
             )
             .unwrap()
     }

@@ -13,6 +13,7 @@
         { "path": "$APPDATA/com.furkanyolal.gametimetracker/**" }
       ]
     },
+    "notification:default",
     "store:default",
     "window-state:default"
   ]

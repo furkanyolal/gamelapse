@@ -5,6 +5,8 @@ use crate::error::{AppError, AppResult};
 
 pub const POLL_MIN: u32 = 1;
 pub const POLL_MAX: u32 = 60;
+pub const REMINDER_MIN: u32 = 300;
+pub const REMINDER_MAX: u32 = 14_400;
 
 impl Default for Settings {
     fn default() -> Self {
@@ -16,6 +18,8 @@ impl Default for Settings {
             tracking_enabled: true,
             theme: Theme::Dark,
             import_on_startup: true,
+            notifications_enabled: true,
+            reminder_interval_secs: 0,
         }
     }
 }
@@ -37,6 +41,13 @@ impl Settings {
             return Err(AppError::Other(
                 "sessionMergeGapSecs must not be negative".into(),
             ));
+        }
+        if self.reminder_interval_secs != 0
+            && !(REMINDER_MIN..=REMINDER_MAX).contains(&self.reminder_interval_secs)
+        {
+            return Err(AppError::Other(format!(
+                "reminderIntervalSecs must be 0 or between {REMINDER_MIN} and {REMINDER_MAX}"
+            )));
         }
         Ok(())
     }
@@ -64,6 +75,12 @@ impl Settings {
         }
         if let Some(v) = patch.import_on_startup {
             next.import_on_startup = v;
+        }
+        if let Some(v) = patch.notifications_enabled {
+            next.notifications_enabled = v;
+        }
+        if let Some(v) = patch.reminder_interval_secs {
+            next.reminder_interval_secs = v;
         }
         next.validate()?;
         Ok(next)

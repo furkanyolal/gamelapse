@@ -286,6 +286,14 @@ pub fn end_session(conn: &Connection, id: i32, ended_at: i64) -> AppResult<Sessi
     get_session(conn, id, ended_at)
 }
 
+pub fn write_afk_secs(conn: &Connection, id: i32, afk_secs: i64) -> AppResult<()> {
+    conn.execute(
+        "UPDATE sessions SET afk_secs = ?1 WHERE id = ?2",
+        params![afk_secs, id],
+    )?;
+    Ok(())
+}
+
 pub fn reopen_session(conn: &Connection, id: i32, now: i64) -> AppResult<()> {
     conn.execute("UPDATE sessions SET ended_at = NULL WHERE id = ?1", [id])?;
     write_heartbeat(conn, id, now)

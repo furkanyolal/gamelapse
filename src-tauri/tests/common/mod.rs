@@ -4,8 +4,9 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use gametimetracker_lib::core::db::{migrations, repo};
-use gametimetracker_lib::core::tracker::{Clock, ProcessSource, Snapshot};
-use gametimetracker_lib::core::types::{GameSource, MatchMode};
+use gametimetracker_lib::core::idle::IdleReading;
+use gametimetracker_lib::core::tracker::{Clock, ProcessSource, Snapshot, Tracker, TrackerEvent};
+use gametimetracker_lib::core::types::{ActiveSession, GameSource, MatchMode, Session, Settings};
 use rusqlite::Connection;
 
 pub fn test_db() -> Connection {
@@ -42,6 +43,72 @@ impl FakeSource {
 impl ProcessSource for FakeSource {
     fn snapshot(&mut self) -> Snapshot {
         self.0.lock().unwrap().clone()
+    }
+}
+
+pub const FOO_EXE: &str = r"c:\games\foo\foo.exe";
+pub const BAR_EXE: &str = r"c:\games\bar\bar.exe";
+
+/// A tracker with a database, a fake process list and settings, driven tick by tick with an
+/// explicit idle reading. Game "Foo" is created up front.
+pub struct TrackRig {
+    pub conn: Connection,
+    pub tracker: Tracker,
+    pub source: FakeSource,
+    pub settings: Settings,
+    pub game: i32,
+}
+
+impl TrackRig {
+    pub fn new() -> Self {
+        let conn = test_db();
+        let game = add_game(&conn, "Foo", FOO_EXE, MatchMode::ExactPath);
+        let source = FakeSource::default();
+        source.set(&[FOO_EXE], None);
+        Self {
+            conn,
+            tracker: Tracker::new(),
+            source,
+            settings: Settings::default(),
+            game,
+        }
+    }
+
+    pub fn tick_with(&mut self, now: i64, idle: IdleReading) -> Vec<TrackerEvent> {
+        let snapshot = self
+            .settings
+            .tracking_enabled
+            .then(|| self.source.snapshot());
+        self.tracker
+            .tick(&self.conn, &self.settings, snapshot.as_ref(), idle, now)
+            .unwrap()
+    }
+
+    /// Tick with `idle_secs` since the last input and an unlocked workstation.
+    pub fn tick(&mut self, now: i64, idle_secs: i64) -> Vec<TrackerEvent> {
+        self.tick_with(
+            now,
+            IdleReading {
+                idle_secs: Some(idle_secs),
+                locked: false,
+            },
+        )
+    }
+
+    /// The last `Updated` payload for a game in a batch of events.
+    pub fn updated(events: &[TrackerEvent], game: i32) -> ActiveSession {
+        events
+            .iter()
+            .rev()
+            .find_map(|e| match e {
+                TrackerEvent::Updated(a) if a.game_id == game => Some(a.clone()),
+                _ => None,
+            })
+            .expect("an Updated event for the game")
+    }
+
+    pub fn session(&self, id: i32, now: i64) -> Session {
+        repo::get_session(&self.conn, id, now).unwrap()
     }
 }
 

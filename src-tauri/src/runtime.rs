@@ -3,9 +3,12 @@
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 
+use crate::core::idle::{IdleReading, IdleSource, WinIdleSource};
 use crate::core::tracker::sysinfo_source::SysinfoProcessSource;
 use crate::core::tracker::{Clock, ProcessSource, SystemClock, TrackerEvent};
+use crate::core::types::{LimitScope, LimitStatus, Reminder};
 use crate::state::AppState;
 
 const SLEEP_SLICE: Duration = Duration::from_millis(250);
@@ -17,11 +20,62 @@ pub fn emit_tracker_events(app: &AppHandle, events: Vec<TrackerEvent>) {
             TrackerEvent::Updated(a) => app.emit("session-updated", a),
             TrackerEvent::Ended(s) => app.emit("session-ended", s),
             TrackerEvent::StatusChanged(s) => app.emit("tracker-status-changed", s),
+            TrackerEvent::LimitReached(s) => {
+                notify_limit_reached(app, &s);
+                app.emit("limit-reached", s)
+            }
+            TrackerEvent::Reminder(r) => {
+                notify_reminder(app, &r);
+                app.emit("reminder", r)
+            }
         };
         if let Err(e) = result {
             tracing::warn!(error = %e, "failed to emit tracker event");
         }
     }
+}
+
+/// "2h 05m" or "45m".
+fn format_duration(secs: i64) -> String {
+    let minutes = secs.max(0) / 60;
+    if minutes >= 60 {
+        format!("{}h {:02}m", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes}m")
+    }
+}
+
+fn show_notification(app: &AppHandle, title: String, body: String) {
+    if !app.state::<AppState>().settings().notifications_enabled {
+        return;
+    }
+    if let Err(e) = app.notification().builder().title(title).body(body).show() {
+        tracing::warn!(error = %e, "failed to show notification");
+    }
+}
+
+fn notify_limit_reached(app: &AppHandle, status: &LimitStatus) {
+    let title = match (status.limit.scope, &status.limit.game_name) {
+        (LimitScope::Game, Some(name)) => format!("{name}: daily limit reached"),
+        _ => "Daily play limit reached".to_string(),
+    };
+    let body = format!(
+        "{} played today (limit {}).",
+        format_duration(status.used_today_secs),
+        format_duration(status.limit.daily_secs)
+    );
+    show_notification(app, title, body);
+}
+
+fn notify_reminder(app: &AppHandle, reminder: &Reminder) {
+    show_notification(
+        app,
+        format!("Still playing {}", reminder.game_name),
+        format!(
+            "You have been playing for {}.",
+            format_duration(reminder.elapsed_secs)
+        ),
+    );
 }
 
 pub fn emit_library_changed(app: &AppHandle) {
@@ -96,9 +150,10 @@ fn run_loop(app: AppHandle) {
         }
     };
     let clock = SystemClock;
+    let mut idle = WinIdleSource::new();
     loop {
         let started = Instant::now();
-        poll_once(&app, &mut source, &clock);
+        poll_once(&app, &mut source, &mut idle, &clock);
         // Re-read the interval while waiting so a settings change applies promptly.
         loop {
             let interval = app.state::<AppState>().settings().poll_interval_secs;
@@ -112,16 +167,29 @@ fn run_loop(app: AppHandle) {
     }
 }
 
-fn poll_once(app: &AppHandle, source: &mut dyn ProcessSource, clock: &dyn Clock) {
+fn poll_once(
+    app: &AppHandle,
+    source: &mut dyn ProcessSource,
+    idle: &mut dyn IdleSource,
+    clock: &dyn Clock,
+) {
     let state = app.state::<AppState>();
     let settings = state.settings();
     // Enumerating processes is the slow part; do it before taking any lock.
     let snapshot = settings.tracking_enabled.then(|| source.snapshot());
+    // Idle (and gamepad) sampling only matters while a session runs. A session that starts on
+    // this very poll gets no reading and counts as active input.
+    let reading = if state.tracker().has_active() {
+        idle.read()
+    } else {
+        idle.reset();
+        IdleReading::default()
+    };
     let now = clock.now();
     let result = {
         let mut tracker = state.tracker();
         let db = state.db();
-        tracker.tick(&db, &settings, snapshot.as_ref(), now)
+        tracker.tick(&db, &settings, snapshot.as_ref(), reading, now)
     };
     match result {
         Ok(events) => emit_tracker_events(app, events),

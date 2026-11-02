@@ -232,6 +232,9 @@ pub struct Settings {
     pub tracking_enabled: bool,
     pub theme: Theme,
     pub import_on_startup: bool,
+    pub notifications_enabled: bool,
+    /// 0 turns reminders off; otherwise 300 to 14400.
+    pub reminder_interval_secs: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, Type)]
@@ -246,6 +249,8 @@ pub struct SettingsUpdate {
     pub tracking_enabled: Option<bool>,
     pub theme: Option<Theme>,
     pub import_on_startup: Option<bool>,
+    pub notifications_enabled: Option<bool>,
+    pub reminder_interval_secs: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Type)]
@@ -343,4 +348,67 @@ pub struct ImportResult {
 pub struct SteamApiSettings {
     pub api_key: Option<String>,
     pub steam_id64: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum LimitScope {
+    Global,
+    Game,
+}
+str_enum!(LimitScope { Global => "global", Game => "game" });
+
+/// `Notify` fires once per day; `NotifyRepeat` fires again every 15 minutes while still playing.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum LimitAction {
+    Notify,
+    NotifyRepeat,
+}
+str_enum!(LimitAction { Notify => "notify", NotifyRepeat => "notify_repeat" });
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Limit {
+    pub id: i32,
+    pub scope: LimitScope,
+    /// `None` for a global limit.
+    pub game_id: Option<i32>,
+    pub game_name: Option<String>,
+    #[specta(type = specta_typescript::Number)]
+    pub daily_secs: i64,
+    pub action: LimitAction,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LimitInput {
+    pub scope: LimitScope,
+    pub game_id: Option<i32>,
+    #[specta(type = specta_typescript::Number)]
+    pub daily_secs: i64,
+    pub action: LimitAction,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LimitStatus {
+    pub limit: Limit,
+    /// Today's play counted against this limit, active sessions included, AFK excluded.
+    #[specta(type = specta_typescript::Number)]
+    pub used_today_secs: i64,
+    /// `max(0, dailySecs - usedTodaySecs)`.
+    #[specta(type = specta_typescript::Number)]
+    pub remaining_secs: i64,
+    pub reached: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Reminder {
+    pub session_id: i32,
+    pub game_id: i32,
+    pub game_name: String,
+    #[specta(type = specta_typescript::Number)]
+    pub elapsed_secs: i64,
 }

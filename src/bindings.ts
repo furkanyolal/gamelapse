@@ -37,6 +37,10 @@ export const commands = {
 	getSteamApiSettings: () => typedError<SteamApiSettings_Serialize, string>(__TAURI_INVOKE("get_steam_api_settings")),
 	setSteamApiSettings: (settings: SteamApiSettings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("set_steam_api_settings", { settings })),
 	fetchSteamPlaytime: () => typedError<ImportResult, string>(__TAURI_INVOKE("fetch_steam_playtime")),
+	listLimits: () => typedError<LimitStatus_Serialize[], string>(__TAURI_INVOKE("list_limits")),
+	createLimit: (input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("create_limit", { input })),
+	updateLimit: (limitId: number, input: LimitInput_Deserialize) => typedError<Limit_Serialize, string>(__TAURI_INVOKE("update_limit", { limitId, input })),
+	deleteLimit: (limitId: number) => typedError<null, string>(__TAURI_INVOKE("delete_limit", { limitId })),
 };
 
 /* Types */
@@ -231,6 +235,69 @@ export type ImportSourceStatus_Serialize = {
 	lastScanAt: number | null,
 };
 
+export type Limit = Limit_Serialize | Limit_Deserialize;
+
+/**  `Notify` fires once per day; `NotifyRepeat` fires again every 15 minutes while still playing. */
+export type LimitAction = "notify" | "notify_repeat";
+
+export type LimitInput = LimitInput_Serialize | LimitInput_Deserialize;
+
+export type LimitInput_Deserialize = {
+	scope: LimitScope,
+	gameId?: number | null,
+	dailySecs: number,
+	action: LimitAction,
+};
+
+export type LimitInput_Serialize = {
+	scope: LimitScope,
+	gameId: number | null,
+	dailySecs: number,
+	action: LimitAction,
+};
+
+export type LimitScope = "global" | "game";
+
+export type LimitStatus = LimitStatus_Serialize | LimitStatus_Deserialize;
+
+export type LimitStatus_Deserialize = {
+	limit: Limit_Deserialize,
+	/**  Today's play counted against this limit, active sessions included, AFK excluded. */
+	usedTodaySecs: number,
+	/**  `max(0, dailySecs - usedTodaySecs)`. */
+	remainingSecs: number,
+	reached: boolean,
+};
+
+export type LimitStatus_Serialize = {
+	limit: Limit_Serialize,
+	/**  Today's play counted against this limit, active sessions included, AFK excluded. */
+	usedTodaySecs: number,
+	/**  `max(0, dailySecs - usedTodaySecs)`. */
+	remainingSecs: number,
+	reached: boolean,
+};
+
+export type Limit_Deserialize = {
+	id: number,
+	scope: LimitScope,
+	/**  `None` for a global limit. */
+	gameId?: number | null,
+	gameName?: string | null,
+	dailySecs: number,
+	action: LimitAction,
+};
+
+export type Limit_Serialize = {
+	id: number,
+	scope: LimitScope,
+	/**  `None` for a global limit. */
+	gameId: number | null,
+	gameName: string | null,
+	dailySecs: number,
+	action: LimitAction,
+};
+
 export type MatchMode = "exact_path" | "install_dir_prefix" | "exe_name";
 
 export type Session = Session_Serialize | Session_Deserialize;
@@ -309,6 +376,9 @@ export type Settings = {
 	trackingEnabled: boolean,
 	theme: Theme,
 	importOnStartup: boolean,
+	notificationsEnabled: boolean,
+	/**  0 turns reminders off; otherwise 300 to 14400. */
+	reminderIntervalSecs: number,
 };
 
 export type SettingsUpdate = SettingsUpdate_Serialize | SettingsUpdate_Deserialize;
@@ -321,6 +391,8 @@ export type SettingsUpdate_Deserialize = {
 	trackingEnabled?: boolean | null,
 	theme?: Theme | null,
 	importOnStartup?: boolean | null,
+	notificationsEnabled?: boolean | null,
+	reminderIntervalSecs?: number | null,
 };
 
 export type SettingsUpdate_Serialize = {
@@ -331,6 +403,8 @@ export type SettingsUpdate_Serialize = {
 	trackingEnabled: boolean | null,
 	theme: Theme | null,
 	importOnStartup: boolean | null,
+	notificationsEnabled: boolean | null,
+	reminderIntervalSecs: number | null,
 };
 
 export type SteamApiSettings = SteamApiSettings_Serialize | SteamApiSettings_Deserialize;

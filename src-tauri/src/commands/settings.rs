@@ -24,6 +24,9 @@ pub fn load_settings(app: &AppHandle) -> Settings {
             // Settings saved before Phase 3 lack this field; keep them instead of resetting.
             if let Some(obj) = value.as_object_mut() {
                 obj.entry("importOnStartup").or_insert(true.into());
+                // Same for the Phase 4 fields.
+                obj.entry("notificationsEnabled").or_insert(true.into());
+                obj.entry("reminderIntervalSecs").or_insert(0.into());
             }
             value
         })

@@ -8,6 +8,7 @@ pub mod games;
 pub mod imports;
 pub mod library;
 pub mod limits;
+pub mod scan;
 pub mod sessions;
 pub mod settings;
 pub mod stats;

@@ -56,6 +56,7 @@ winreg = "0.56"
 keyvalues-parser = "0.2"
 ureq = "3"
 tempfile = "3"
+walkdir = "2"
 
 # Debug info is off in dev builds to keep `target/` small (full debug info needs several GB on Windows).
 # Switch to `debug = "line-tables-only"` once disk space allows, for line numbers in backtraces.

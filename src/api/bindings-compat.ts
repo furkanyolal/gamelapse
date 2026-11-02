@@ -43,6 +43,10 @@ export type OutputChecks = [
   Assert<Mutual<B.ExportResult, T.ExportResult>>,
   Assert<Mutual<B.BackupInfo, T.BackupInfo>>,
   Assert<Mutual<B.UpdateInfo_Serialize, T.UpdateInfo>>,
+  Assert<Mutual<B.ScanRoot, T.ScanRoot>>,
+  Assert<Mutual<B.ExeCandidate, T.ExeCandidate>>,
+  Assert<Mutual<B.ScanCandidate_Serialize, T.ScanCandidate>>,
+  Assert<Mutual<B.MetadataMatch, T.MetadataMatch>>,
 ];
 
 export type InputChecks = [
@@ -53,4 +57,5 @@ export type InputChecks = [
   Assert<Accepts<T.SteamApiSettings, B.SteamApiSettings_Deserialize>>,
   Assert<Accepts<T.LimitInput, B.LimitInput_Deserialize>>,
   Assert<Accepts<T.ExportOptions, B.ExportOptions_Deserialize>>,
+  Assert<Accepts<T.ScanSelection, B.ScanSelection_Deserialize>>,
 ];

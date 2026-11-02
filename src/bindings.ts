@@ -66,6 +66,16 @@ export const commands = {
 	 *  `update-progress` while downloading. On Windows the installer ends the process itself.
 	 */
 	installUpdate: () => typedError<null, string>(__TAURI_INVOKE("install_update")),
+	/**  Native folder picker. Async so the blocking dialog never runs on the main thread. */
+	pickFolder: () => typedError<string | null, string>(__TAURI_INVOKE("pick_folder")),
+	listScanRoots: () => typedError<ScanRoot[], string>(__TAURI_INVOKE("list_scan_roots")),
+	addScanRoot: (path: string) => typedError<ScanRoot, string>(__TAURI_INVOKE("add_scan_root", { path })),
+	removeScanRoot: (rootId: number) => typedError<null, string>(__TAURI_INVOKE("remove_scan_root", { rootId })),
+	/**  Scans the chosen roots (`None`: all). Only reads; the walk holds no database lock. */
+	scanFolders: (rootIds: number[] | null) => typedError<ScanCandidate_Serialize[], string>(__TAURI_INVOKE("scan_folders", { rootIds })),
+	addScannedGames: (selection: ScanSelection_Deserialize[]) => typedError<ImportResult, string>(__TAURI_INVOKE("add_scanned_games", { selection })),
+	lookupGameMetadata: (name: string) => typedError<MetadataMatch[], string>(__TAURI_INVOKE("lookup_game_metadata", { name })),
+	applyGameMetadata: (gameId: number, found: MetadataMatch, renameGame: boolean) => typedError<Game_Serialize, string>(__TAURI_INVOKE("apply_game_metadata", { gameId, found, renameGame })),
 };
 
 /* Types */
@@ -149,6 +159,15 @@ export type DiscoveredGame_Serialize = {
 	alreadyImported: boolean,
 };
 
+export type ExeCandidate = {
+	path: string,
+	sizeBytes: number,
+	/**  Higher is more likely the main game executable. */
+	score: number,
+	/**  Short human-readable reasons, e.g. "name matches folder". */
+	reasons: string[],
+};
+
 export type ExportFormat = "csv" | "json";
 
 export type ExportOptions = ExportOptions_Serialize | ExportOptions_Deserialize;
@@ -186,7 +205,7 @@ export type GameExecutable = {
 	matchMode: MatchMode,
 };
 
-export type GameSource = "manual" | "steam" | "epic" | "gog";
+export type GameSource = "manual" | "steam" | "epic" | "gog" | "amazon";
 
 export type GameSummary = GameSummary_Serialize | GameSummary_Deserialize;
 
@@ -276,7 +295,7 @@ export type ImportResult = {
 	errors: string[],
 };
 
-export type ImportSource = "steam" | "epic" | "gog";
+export type ImportSource = "steam" | "epic" | "gog" | "heroic";
 
 export type ImportSourceStatus = ImportSourceStatus_Serialize | ImportSourceStatus_Deserialize;
 
@@ -367,6 +386,66 @@ export type MergeResult = {
 	survivorId: number,
 	mergedSessions: number,
 	mergedExecutables: number,
+};
+
+export type MetadataMatch = {
+	steamAppId: number,
+	name: string,
+	coverUrl: string,
+};
+
+export type ScanCandidate = ScanCandidate_Serialize | ScanCandidate_Deserialize;
+
+export type ScanCandidate_Deserialize = {
+	rootId: number,
+	/**  Absolute path of the top-level folder under the root. */
+	folder: string,
+	/**  Cleaned from the folder name. */
+	suggestedName: string,
+	/**  Sorted by score, descending; junk excluded; at most 8. */
+	executables: ExeCandidate[],
+	confidence: ScanConfidence,
+	/**  A library game already has an executable rule under this folder. */
+	existingGameId?: number | null,
+};
+
+export type ScanCandidate_Serialize = {
+	rootId: number,
+	/**  Absolute path of the top-level folder under the root. */
+	folder: string,
+	/**  Cleaned from the folder name. */
+	suggestedName: string,
+	/**  Sorted by score, descending; junk excluded; at most 8. */
+	executables: ExeCandidate[],
+	confidence: ScanConfidence,
+	/**  A library game already has an executable rule under this folder. */
+	existingGameId: number | null,
+};
+
+export type ScanConfidence = "high" | "medium" | "low";
+
+export type ScanRoot = {
+	id: number,
+	path: string,
+	createdAt: number,
+};
+
+export type ScanSelection = ScanSelection_Serialize | ScanSelection_Deserialize;
+
+export type ScanSelection_Deserialize = {
+	folder: string,
+	name: string,
+	exePath: string,
+	/**  Optional cover to download, from a metadata match. */
+	coverUrl?: string | null,
+};
+
+export type ScanSelection_Serialize = {
+	folder: string,
+	name: string,
+	exePath: string,
+	/**  Optional cover to download, from a metadata match. */
+	coverUrl: string | null,
 };
 
 export type Session = Session_Serialize | Session_Deserialize;

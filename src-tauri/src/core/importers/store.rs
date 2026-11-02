@@ -63,11 +63,11 @@ pub fn import_games(
     errors: Vec<String>,
     now: i64,
 ) -> AppResult<ImportResult> {
-    let game_source = source.game_source();
     let tx = conn.unchecked_transaction()?;
     let (mut added, mut updated, mut skipped) = (0, 0, 0);
 
     for found in games {
+        let game_source = found.library_source();
         let existing = tx
             .query_row(
                 "SELECT id, install_dir, cover_path FROM games WHERE source = ?1 AND source_id = ?2",

@@ -80,6 +80,14 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         commands::autostart::set_autostart,
         commands::updates::check_for_update,
         commands::updates::install_update,
+        commands::scan::pick_folder,
+        commands::scan::list_scan_roots,
+        commands::scan::add_scan_root,
+        commands::scan::remove_scan_root,
+        commands::scan::scan_folders,
+        commands::scan::add_scanned_games,
+        commands::scan::lookup_game_metadata,
+        commands::scan::apply_game_metadata,
     ])
 }
 

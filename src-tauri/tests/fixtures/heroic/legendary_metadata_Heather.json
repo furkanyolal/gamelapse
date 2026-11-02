@@ -1,0 +1,12 @@
+{
+  "app_name": "Heather",
+  "app_title": "Red Dead Redemption 2",
+  "metadata": {
+    "keyImages": [
+      { "type": "DieselGameBox", "url": "https://cdn1.epicgames.com/box-2560x1440.jpg" },
+      { "type": "DieselGameBoxLogo", "url": "https://cdn1.epicgames.com/logo.png" },
+      { "type": "DieselGameBoxTall", "url": "https://cdn1.epicgames.com/tall-1280x1440.jpg" }
+    ],
+    "title": "Red Dead Redemption 2"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "02855a2f4c044aa1a813b19f8c447fe1": {
+    "app_name": "02855a2f4c044aa1a813b19f8c447fe1",
+    "executable": "",
+    "install_path": "@ROOT@\\Games\\Cyberpunk2077",
+    "is_dlc": true,
+    "platform": "Windows",
+    "title": "Cyberpunk 2077 - REDmod",
+    "version": "2.31_hotfix_RedMod"
+  },
+  "Ginger": {
+    "app_name": "Ginger",
+    "executable": "redprelauncher.exe",
+    "install_path": "@ROOT@\\Games\\Cyberpunk2077",
+    "is_dlc": false,
+    "platform": "Windows",
+    "title": "Cyberpunk 2077",
+    "version": "2.31_hotfix"
+  },
+  "Heather": {
+    "app_name": "Heather",
+    "executable": "PlayRDR2.exe",
+    "install_path": "@ROOT@\\Games\\RedDeadRedemption2",
+    "is_dlc": false,
+    "platform": "Windows",
+    "title": "Red Dead Redemption 2",
+    "version": "1.0.1491.50_v5"
+  },
+  "MacOnly": {
+    "app_name": "MacOnly",
+    "executable": "mac.app",
+    "install_path": "@ROOT@\\Games\\RedDeadRedemption2",
+    "is_dlc": false,
+    "platform": "Mac",
+    "title": "Mac Only Game",
+    "version": "1"
+  }
+}

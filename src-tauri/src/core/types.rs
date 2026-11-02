@@ -38,8 +38,15 @@ pub enum GameSource {
     Steam,
     Epic,
     Gog,
+    Amazon,
 }
-str_enum!(GameSource { Manual => "manual", Steam => "steam", Epic => "epic", Gog => "gog" });
+str_enum!(GameSource {
+    Manual => "manual",
+    Steam => "steam",
+    Epic => "epic",
+    Gog => "gog",
+    Amazon => "amazon",
+});
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
@@ -315,17 +322,21 @@ pub enum ImportSource {
     Steam,
     Epic,
     Gog,
+    Heroic,
 }
-str_enum!(ImportSource { Steam => "steam", Epic => "epic", Gog => "gog" });
+str_enum!(ImportSource { Steam => "steam", Epic => "epic", Gog => "gog", Heroic => "heroic" });
 
 impl ImportSource {
-    pub const ALL: [ImportSource; 3] = [Self::Steam, Self::Epic, Self::Gog];
+    pub const ALL: [ImportSource; 4] = [Self::Steam, Self::Epic, Self::Gog, Self::Heroic];
 
+    /// The library source of this launcher's games. Heroic manages games of several stores;
+    /// each of its games carries its own [`DiscoveredGame::game_source`].
     pub fn game_source(self) -> GameSource {
         match self {
             Self::Steam => GameSource::Steam,
             Self::Epic => GameSource::Epic,
             Self::Gog => GameSource::Gog,
+            Self::Heroic => GameSource::Manual,
         }
     }
 }
@@ -356,6 +367,18 @@ pub struct DiscoveredGame {
     pub playtime_minutes: Option<i64>,
     /// A game with this source and sourceId already exists.
     pub already_imported: bool,
+    /// Library source when it differs from the launcher's own (Heroic: epic, gog, amazon or
+    /// manual). Internal; not part of the IPC type.
+    #[serde(skip)]
+    pub game_source: Option<GameSource>,
+}
+
+impl DiscoveredGame {
+    /// The `games.source` value this game is stored under.
+    pub fn library_source(&self) -> GameSource {
+        self.game_source
+            .unwrap_or_else(|| self.source.game_source())
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
@@ -490,4 +513,68 @@ pub struct BackupInfo {
     pub created_at: i64,
     #[specta(type = specta_typescript::Number)]
     pub size_bytes: i64,
+}
+
+// ------------------------------------------------------------ Phase 7
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanRoot {
+    pub id: i32,
+    pub path: String,
+    #[specta(type = specta_typescript::Number)]
+    pub created_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ExeCandidate {
+    pub path: String,
+    #[specta(type = specta_typescript::Number)]
+    pub size_bytes: i64,
+    /// Higher is more likely the main game executable.
+    pub score: i32,
+    /// Short human-readable reasons, e.g. "name matches folder".
+    pub reasons: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "lowercase")]
+pub enum ScanConfidence {
+    High,
+    Medium,
+    Low,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanCandidate {
+    pub root_id: i32,
+    /// Absolute path of the top-level folder under the root.
+    pub folder: String,
+    /// Cleaned from the folder name.
+    pub suggested_name: String,
+    /// Sorted by score, descending; junk excluded; at most 8.
+    pub executables: Vec<ExeCandidate>,
+    pub confidence: ScanConfidence,
+    /// A library game already has an executable rule under this folder.
+    pub existing_game_id: Option<i32>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanSelection {
+    pub folder: String,
+    pub name: String,
+    pub exe_path: String,
+    /// Optional cover to download, from a metadata match.
+    pub cover_url: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataMatch {
+    pub steam_app_id: u32,
+    pub name: String,
+    pub cover_url: String,
 }

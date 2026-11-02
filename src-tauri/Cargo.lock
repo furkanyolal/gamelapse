@@ -1229,6 +1229,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "ureq",
+ "walkdir",
  "windows-sys 0.61.2",
  "winreg",
 ]

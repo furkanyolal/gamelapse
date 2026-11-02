@@ -116,3 +116,62 @@ pub fn http_download(url: &str) -> Result<Vec<u8>, String> {
     }
     Ok(response.body)
 }
+
+/// A file-name-safe version of a source id (sideload ids contain a colon).
+fn safe_file_stem(id: &str) -> String {
+    id.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+/// Where a launcher-supplied cover is cached: `<app data>/covers/<subdir>/<id>.jpg`.
+pub fn url_cover_path(data_dir: &Path, subdir: &str, source_id: &str) -> PathBuf {
+    data_dir
+        .join("covers")
+        .join(subdir)
+        .join(format!("{}.jpg", safe_file_stem(source_id)))
+}
+
+/// Downloads each launcher-supplied cover that is not cached yet. Returns
+/// `sourceId -> absolute file path` for covers that exist afterwards. Failures are logged
+/// and otherwise ignored; the rest is abandoned after repeated failures (most likely offline).
+pub fn ensure_url_covers(
+    data_dir: &Path,
+    items: &[super::CoverSource],
+    download: &Downloader,
+) -> HashMap<String, String> {
+    let mut covers = HashMap::new();
+    let mut failures = 0;
+    for item in items {
+        let path = url_cover_path(data_dir, item.subdir, &item.source_id);
+        if path.is_file() {
+            covers.insert(item.source_id.clone(), path.display().to_string());
+            continue;
+        }
+        if failures >= MAX_CONSECUTIVE_FAILURES {
+            continue;
+        }
+        match fetch_one(&path, &item.url, download) {
+            Ok(()) => {
+                failures = 0;
+                covers.insert(item.source_id.clone(), path.display().to_string());
+            }
+            Err(e) => {
+                failures += 1;
+                tracing::debug!(id = %item.source_id, error = %e, "cover download failed");
+            }
+        }
+    }
+    covers
+}
+
+/// Downloads `url` to `path` (JPEG only), replacing any existing file.
+pub fn download_to(path: &Path, url: &str, download: &Downloader) -> Result<(), String> {
+    fetch_one(path, url, download)
+}

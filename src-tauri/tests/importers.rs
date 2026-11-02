@@ -481,6 +481,7 @@ fn discovered(id: &str, name: &str, dir: Option<&str>, minutes: Option<i64>) -> 
         executables: vec![],
         playtime_minutes: minutes,
         already_imported: false,
+        game_source: None,
     }
 }
 

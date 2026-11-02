@@ -194,6 +194,7 @@ impl Importer for SteamImporter {
                     executables: Vec::new(),
                     playtime_minutes: None,
                     already_imported: false,
+                    game_source: None,
                 });
             }
         }

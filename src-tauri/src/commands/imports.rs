@@ -52,7 +52,7 @@ pub fn run_import(app: &AppHandle, source: ImportSource) -> AppResult<ImportResu
     let covers = if source == ImportSource::Steam {
         covers::ensure_steam_covers(&state.data_dir, &scan.games, &covers::http_download)
     } else {
-        Default::default()
+        covers::ensure_url_covers(&state.data_dir, &scan.covers, &covers::http_download)
     };
     let result = {
         let db = state.db();

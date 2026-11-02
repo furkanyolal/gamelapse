@@ -76,6 +76,7 @@ impl GogImporter {
                 executables,
                 playtime_minutes: None,
                 already_imported: false,
+                game_source: None,
             });
         }
         games.sort_by(|a, b| a.source_id.cmp(&b.source_id));
@@ -170,7 +171,7 @@ impl Importer for GogImporter {
         }
         let mut scan = Scan {
             games: self.registry_games(),
-            errors: Vec::new(),
+            ..Scan::default()
         };
         if self.galaxy_db.is_file() {
             match read_galaxy_db(&self.galaxy_db) {

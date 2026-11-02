@@ -48,6 +48,14 @@ Everything is stored locally in SQLite under `%APPDATA%\com.furkanyolal.gamelaps
 - the per-candidate Steam store search you trigger
 - update checks against GitHub
 
+### Totals and hidden games
+
+Launchers such as Steam report hours you played before Gamelapse existed. Those hours count toward a game's all-time total, and only there. They never count twice: a re-import does not add them again, and hours Gamelapse tracked itself are not added on top. They have no dates, so they stay out of today, weekly and daily figures.
+
+A hidden game is still tracked and keeps its sessions. It stays out of lists, totals, charts, the now-playing strip and global limits. Its own page still shows everything. Steam tools such as Wallpaper Engine and Lossless Scaling are hidden automatically on import. You can unhide them.
+
+If you delete a game that was imported from a launcher, it stays deleted. The next import does not bring it back. To get it back, restore it from the Import dialog.
+
 ## Adding games
 
 - **Automatic import:** Gamelapse scans your installed launchers on startup. You can turn this off in Settings ("Import on startup").

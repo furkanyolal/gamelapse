@@ -34,6 +34,9 @@ First public release.
   - Games folders: confirm-first scan of folders you add, with suggested names and executables; nothing is scanned or added without your click
   - Name and cover lookup through Steam's store search, per scan candidate and from a "Find cover" button
   - Import on startup
+  - Launcher-reported hours count once toward a game's all-time total and are never double counted
+  - Hidden games stay tracked but are left out of lists, totals and the now-playing strip; Steam tools such as Wallpaper Engine and Lossless Scaling are hidden automatically
+  - Deleting an imported game keeps it from coming back on the next import, until you restore it from the Import dialog
   - Optional Steam Web API import of past playtime
   - Tags, merging of duplicate games and custom covers
 - Data

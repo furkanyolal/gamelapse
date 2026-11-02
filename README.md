@@ -14,6 +14,9 @@ Gamelapse is an open source game time tracker for Windows 10 and 11. It lives in
 - Charts: daily, weekly trend, top games and time of day
 - Daily limits and play reminders, with Windows notifications
 - Library import from Steam, Epic Games and GOG Galaxy, with cover art
+- Heroic Games Launcher import: Epic, GOG and Amazon games installed through Heroic, with playtime and covers
+- Games folders: add folders such as `D:\Games`, click Scan, review the suggested names and executables, and tick what to add. Nothing is scanned or added on its own.
+- Name and cover lookup through Steam's store search, per candidate and from a "Find cover" button
 - Optional Steam Web API import of past playtime
 - Tags, merging of duplicate games and custom covers
 - CSV and JSON export
@@ -42,6 +45,7 @@ Everything is stored locally in SQLite under `%APPDATA%\com.furkanyolal.gamelaps
 
 - cover art downloads (optional)
 - the Steam Web API (optional)
+- the per-candidate Steam store search you trigger
 - update checks against GitHub
 
 ## Adding games
@@ -49,6 +53,10 @@ Everything is stored locally in SQLite under `%APPDATA%\com.furkanyolal.gamelaps
 - **Automatic import:** Gamelapse scans your installed launchers on startup. You can turn this off in Settings ("Import on startup").
 - **Import button:** on the Games page, or **Scan** per launcher in Settings.
 - **Add game:** pick an executable by hand.
+
+### Games folders
+
+For games from other sources, add folders such as `D:\Games` in Settings, under **Games folders**. Gamelapse never scans or watches them on its own. A scan runs only when you click **Scan**, and nothing enters your library until you review the suggested names and executables and confirm. Emulator folders scan as one entry per folder for now.
 
 Some games use anti-cheat that hides the process path from other programs. If a game is never detected, add it by its install folder instead of its exe.
 

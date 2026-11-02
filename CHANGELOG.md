@@ -30,6 +30,9 @@ First public release.
   - Windows notifications
 - Library
   - Import from Steam, Epic Games and GOG Galaxy, with cover art
+  - Import from Heroic Games Launcher (Epic, GOG and Amazon games), with playtime and covers
+  - Games folders: confirm-first scan of folders you add, with suggested names and executables; nothing is scanned or added without your click
+  - Name and cover lookup through Steam's store search, per scan candidate and from a "Find cover" button
   - Import on startup
   - Optional Steam Web API import of past playtime
   - Tags, merging of duplicate games and custom covers

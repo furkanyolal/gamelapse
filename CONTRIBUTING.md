@@ -70,5 +70,6 @@ Import is tested with fixture files, so real-world reports are valuable. Open an
 - **Steam:** one `appmanifest_*.acf` from the game's library, in `steamapps` (for example `D:\SteamLibrary\steamapps`).
 - **Epic Games:** the game's `.item` file from `C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests`.
 - **GOG Galaxy:** the values (`gameName`, `path`, `exe`) of the game's key under `HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\GOG.com\Games\<id>`. Export the key from `regedit`, or copy the values.
+- **Heroic:** the game's entry from `%APPDATA%\heroic\legendaryConfig\legendary\installed.json` (Epic) or `%APPDATA%\heroic\gog_store\installed.json` (GOG).
 
 Also attach the relevant part of the log from `%LOCALAPPDATA%\com.furkanyolal.gamelapse\logs`.

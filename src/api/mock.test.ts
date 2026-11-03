@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createMockApi } from "@/api/mock";
-import type { ActiveSession, SettingsUpdate } from "@/api/types";
+import type { ActiveSession, LimitStatus, SettingsUpdate } from "@/api/types";
 
 const noSessionFilter = {
   gameId: null,
@@ -380,8 +380,13 @@ describe("mock api: limits", () => {
         action: "notify",
       });
       vi.advanceTimersByTime(5000);
-      expect(handler).toHaveBeenCalledTimes(1);
-      expect(handler.mock.calls[0][0]).toMatchObject({
+      // Other seeded limits may also be over, depending on the time of day the
+      // demo data is generated at; only the limit we edited matters here.
+      const forEdited = handler.mock.calls
+        .map(([status]) => status as LimitStatus)
+        .filter((status) => status.limit.id === game.limit.id);
+      expect(forEdited).toHaveLength(1);
+      expect(forEdited[0]).toMatchObject({
         reached: true,
         limit: { id: game.limit.id },
       });
